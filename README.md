@@ -5,7 +5,7 @@ e dei comuni limitrofi. Sito statico: i dati stanno nel repository, la
 pubblicazione avviene su GitHub Pages a ogni push su `main`, non c'è nessun
 server né database da gestire.
 
-Sito: <!-- TODO: URL di GitHub Pages dopo il primo deploy -->
+Sito: <https://andreadonati.github.io/trails-of-piateda/>
 
 Per aggiungere un sentiero o correggerne uno, vedi
 [CONTRIBUTING.md](CONTRIBUTING.md).

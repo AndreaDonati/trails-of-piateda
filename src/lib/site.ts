@@ -2,8 +2,7 @@
 
 export const SITE_NAME = 'Sentieri di Piateda';
 
-// TODO: replace <owner> with the GitHub account that hosts the repository (design D7).
-export const REPO_URL = 'https://github.com/<owner>/trails-of-piateda';
+export const REPO_URL = 'https://github.com/AndreaDonati/trails-of-piateda';
 
 /** Data licence file in the repository (design D8), linked from the footer. */
 export const DATA_LICENSE_URL = `${REPO_URL}/blob/main/LICENSE-DATA`;
