@@ -78,7 +78,7 @@ const currentPath = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${A
     <footer class="site-footer">
       <div class="container site-footer__inner">
         <p class="site-footer__attribution">
-          Mappa: {BASEMAP_ATTRIBUTION} | Dati altimetrici:
+          Mappa: {BASEMAP_ATTRIBUTION} | Dati altimetrici:{' '}
           <a href={TERRAIN_PROVIDER.url} rel="noopener" target="_blank">{TERRAIN_ATTRIBUTION}</a>
         </p>
         <p class="site-footer__license">
