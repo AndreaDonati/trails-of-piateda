@@ -1,0 +1,135 @@
+---
+/**
+ * One entry in the list page (task 4.5). Server-rendered: the filter island only toggles
+ * the `hidden` attribute of the <li>, it never re-renders this markup.
+ */
+import { cardElementId, type EntryListItem } from './filters';
+import { difficultyLabel, formatDuration, formatKm, formatMetres, kindLabel } from './format';
+
+export interface Props {
+  entry: EntryListItem;
+}
+
+const { entry } = Astro.props;
+const duration = formatDuration(entry.duration_minutes);
+---
+
+<li class="entry-list__item" id={cardElementId(entry.id)}>
+  <article class="card">
+    <!-- cover insertion point: the photo wave replaces this placeholder with the cover thumbnail -->
+    <div class="card__cover" aria-hidden="true"></div>
+
+    <div class="card__body">
+      <p class="card__kind">{kindLabel(entry.kind)}</p>
+      <h2 class="card__title">
+        <a href={entry.url}>{entry.name}</a>
+      </h2>
+      <p class="card__summary">{entry.summary}</p>
+
+      <ul class="card__stats">
+        <li>
+          <span class="badge-difficulty" data-difficulty={entry.difficulty}>{entry.difficulty}</span>
+          <span class="visually-hidden">{difficultyLabel(entry.difficulty)}</span>
+        </li>
+        <li>{formatKm(entry.length_m)}</li>
+        <li>{entry.ascent_m === null ? 'dislivello non disponibile' : `${formatMetres(entry.ascent_m)} D+`}</li>
+        {duration && <li>{duration}</li>}
+      </ul>
+
+      <p class="card__municipalities">{entry.municipalities.join(', ')}</p>
+    </div>
+  </article>
+</li>
+
+<style>
+  .entry-list__item {
+    list-style: none;
+  }
+
+  /* The island hides cards with the `hidden` attribute; the card sets `display`, which would
+     otherwise win over the browser's [hidden] rule. */
+  .entry-list__item[hidden] {
+    display: none;
+  }
+
+  .card {
+    display: flex;
+    gap: var(--space-3);
+    height: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .card:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card__cover {
+    flex: 0 0 auto;
+    width: 5.5rem;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-muted);
+  }
+
+  .card__body {
+    min-width: 0;
+  }
+
+  .card__kind {
+    margin-bottom: 0;
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .card__title {
+    font-size: var(--font-size-lg);
+  }
+
+  .card__title a {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .card__title a:hover {
+    text-decoration: underline;
+  }
+
+  .card__summary {
+    margin-block: var(--space-1) var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .card__stats {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--font-size-sm);
+  }
+
+  .card__municipalities {
+    margin-block: var(--space-2) 0;
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+  }
+
+  @media (min-width: 768px) {
+    .card {
+      padding: var(--space-4);
+    }
+
+    .card__cover {
+      width: 8rem;
+    }
+  }
+</style>

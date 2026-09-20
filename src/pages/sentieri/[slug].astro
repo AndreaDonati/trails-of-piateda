@@ -1,0 +1,21 @@
+---
+/** Detail page of every trail (task 4.3). The page body is shared with /percorsi/. */
+import type { GetStaticPaths } from 'astro';
+import EntryPage from '../../components/EntryPage.astro';
+import { getEntries, type CatalogEntry } from '../../lib/catalog';
+
+interface Props {
+  entry: CatalogEntry;
+}
+
+export const getStaticPaths = (async () => {
+  const entries = await getEntries();
+  return entries
+    .filter((entry) => entry.kind === 'trail')
+    .map((entry) => ({ params: { slug: entry.slug }, props: { entry } satisfies Props }));
+}) satisfies GetStaticPaths;
+
+const { entry } = Astro.props;
+---
+
+<EntryPage entry={entry} />

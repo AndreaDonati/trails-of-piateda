@@ -1,0 +1,82 @@
+---
+/**
+ * "Contribuisci" page: the header already links here, so it exists to point at the two ways
+ * of contributing that live on GitHub. Everything it describes is documented in
+ * CONTRIBUTING.md; this page only summarises the choice and links there.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { DATA_LICENSE_URL, REPO_URL, SITE_NAME } from '../lib/site';
+
+const contributingUrl = `${REPO_URL}/blob/main/CONTRIBUTING.md`;
+const proposalIssueUrl = `${REPO_URL}/issues/new?template=proposta-sentiero.yml`;
+
+const description =
+  'Come aggiungere o correggere un sentiero del catalogo: pull request con la cartella della voce, oppure una proposta via issue.';
+---
+
+<BaseLayout title={`Contribuisci · ${SITE_NAME}`} description={description}>
+  <div class="contribuisci container">
+    <h1>Contribuisci</h1>
+    <p class="contribuisci__lead">
+      Il catalogo vive nel repository del sito: ogni sentiero è una cartella con un file di metadati e una
+      traccia GPX. Le correzioni e le nuove voci arrivano da lì.
+    </p>
+
+    <section aria-labelledby="titolo-pr">
+      <h2 id="titolo-pr">Con una pull request</h2>
+      <p>
+        Se hai la traccia GPX e un account GitHub, aggiungi una cartella sotto <code>content/trails/</code>
+        (sentiero) o <code>content/routes/</code> (percorso) e apri una pull request. La struttura della
+        cartella, tutti i campi dei metadati e i requisiti del GPX e delle foto sono descritti in
+        <a href={contributingUrl} rel="noopener" target="_blank">CONTRIBUTING.md</a>. Il controllo automatico
+        della pull request verifica i dati e indica la voce e il campo quando qualcosa non va.
+      </p>
+    </section>
+
+    <section aria-labelledby="titolo-issue">
+      <h2 id="titolo-issue">Con una proposta</h2>
+      <p>
+        Se non hai la traccia o preferisci non aprire una pull request, apri una
+        <a href={proposalIssueUrl} rel="noopener" target="_blank">issue di proposta</a>: descrivi il sentiero e,
+        se ce l'hai, allega il GPX. La proposta viene trasformata in una voce del catalogo.
+      </p>
+    </section>
+
+    <section aria-labelledby="titolo-licenza">
+      <h2 id="titolo-licenza">Licenza dei contributi</h2>
+      <p>
+        Tracce, metadati e foto sono pubblicati con licenza
+        <a href={DATA_LICENSE_URL} rel="noopener" target="_blank">CC BY 4.0</a>: aprendo una pull request o una
+        proposta accetti che il materiale che invii sia distribuito con questa licenza.
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .contribuisci {
+    max-width: 70ch;
+    padding-block: var(--space-5);
+  }
+
+  .contribuisci__lead {
+    margin-top: var(--space-3);
+    color: var(--color-text-muted);
+  }
+
+  section {
+    margin-top: var(--space-6);
+  }
+
+  h2 {
+    margin-bottom: var(--space-2);
+  }
+
+  code {
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-muted);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-sm);
+  }
+</style>

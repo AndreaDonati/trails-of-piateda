@@ -1,0 +1,75 @@
+---
+/**
+ * Derived statistics of an entry (task 4.3). Everything but the length comes from the GPX
+ * elevation, so when the track has no <ele> those four values read "non disponibile"
+ * instead of zero, as the trail-browsing spec requires.
+ */
+import type { TrackStats } from '../lib/gpx';
+import { formatDuration, formatKm, formatMetres, NOT_AVAILABLE } from './format';
+
+export interface Props {
+  stats: TrackStats;
+  durationMinutes?: number | undefined;
+}
+
+const { stats, durationMinutes } = Astro.props;
+const elevation = stats.elevation;
+const duration = formatDuration(durationMinutes);
+
+const items: { label: string; value: string }[] = [
+  { label: 'Lunghezza', value: formatKm(stats.length_m) },
+  { label: 'Dislivello in salita', value: elevation ? formatMetres(elevation.ascent_m) : NOT_AVAILABLE },
+  { label: 'Dislivello in discesa', value: elevation ? formatMetres(elevation.descent_m) : NOT_AVAILABLE },
+  { label: 'Quota minima', value: elevation ? formatMetres(elevation.min_m) : NOT_AVAILABLE },
+  { label: 'Quota massima', value: elevation ? formatMetres(elevation.max_m) : NOT_AVAILABLE },
+  ...(duration ? [{ label: 'Durata indicativa', value: duration }] : []),
+];
+---
+
+<dl class="stats">
+  {
+    items.map((item) => (
+      <div class="stats__item">
+        <dt>{item.label}</dt>
+        <dd>{item.value}</dd>
+      </div>
+    ))
+  }
+</dl>
+
+<style>
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin: 0;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+  }
+
+  .stats__item {
+    min-width: 0;
+  }
+
+  dt {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  dd {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-medium);
+  }
+
+  @media (min-width: 768px) {
+    .stats {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      padding: var(--space-4);
+    }
+  }
+</style>

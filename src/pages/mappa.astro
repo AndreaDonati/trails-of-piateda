@@ -1,0 +1,42 @@
+---
+/**
+ * Overview map (task 5.4). Full viewport under the header: BaseLayout's `fullBleed` makes
+ * <main> fill the space below the header and the wrapper below stretches into it, so the
+ * map gets a real height without a viewport-unit guess that would ignore the header.
+ *
+ * Terrain is on and framed on the data, and the collapsible legend is the one built into
+ * the island (difficulty colours plus the solid/dashed distinction between the two kinds).
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TrackMap from '../components/map/TrackMap';
+import { DEFAULT_TERRAIN_EXAGGERATION } from '../lib/mapConfig';
+import { SITE_NAME, withBase } from '../lib/site';
+
+const description =
+  'Mappa di tutti i sentieri e percorsi di Piateda su base topografica, con terreno 3D e legenda delle difficoltà.';
+---
+
+<BaseLayout title={`Mappa · ${SITE_NAME}`} description={description} fullBleed>
+  <h1 class="visually-hidden">Mappa dei sentieri e dei percorsi</h1>
+  <div class="mappa">
+    <TrackMap
+      client:only="react"
+      dataUrl={withBase('/data/overview.geojson')}
+      mode="overview"
+      terrain
+      exaggeration={DEFAULT_TERRAIN_EXAGGERATION}
+      fit="data"
+      legend
+      height="100%"
+    />
+  </div>
+</BaseLayout>
+
+<style>
+  .mappa {
+    flex: 1 1 auto;
+    /* Without a minimum the flex item collapses on browsers that resolve the parent's
+       min-height late; 60vh keeps the map usable in that case. */
+    min-height: max(60vh, 320px);
+  }
+</style>

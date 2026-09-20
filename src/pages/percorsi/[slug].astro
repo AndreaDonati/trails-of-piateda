@@ -1,0 +1,42 @@
+---
+/**
+ * Detail page of every route (task 4.3). Same body as /sentieri/, plus the links to the
+ * trails the route is composed of, resolved here because only the route schema has them.
+ */
+import type { GetStaticPaths } from 'astro';
+import EntryPage from '../../components/EntryPage.astro';
+import { getEntries, type CatalogEntry } from '../../lib/catalog';
+
+type RouteEntry = Extract<CatalogEntry, { kind: 'route' }>;
+
+interface Props {
+  entry: CatalogEntry;
+  relatedTrails: { name: string; url: string }[];
+}
+
+export const getStaticPaths = (async () => {
+  const entries = await getEntries();
+  const trails = new Map(
+    entries.filter((entry) => entry.kind === 'trail').map((entry) => [entry.slug, { name: entry.data.name, url: entry.url }]),
+  );
+
+  return entries
+    .filter((entry): entry is RouteEntry => entry.kind === 'route')
+    .map((entry) => ({
+      params: { slug: entry.slug },
+      props: {
+        entry,
+        // References are validated by the schema, so a miss here would be a bug rather than
+        // contributor data; dropping it keeps the page rendering instead of failing.
+        relatedTrails: entry.data.trails.flatMap((ref) => {
+          const trail = trails.get(ref.id);
+          return trail ? [trail] : [];
+        }),
+      } satisfies Props,
+    }));
+}) satisfies GetStaticPaths;
+
+const { entry, relatedTrails } = Astro.props;
+---
+
+<EntryPage entry={entry} relatedTrails={relatedTrails} />

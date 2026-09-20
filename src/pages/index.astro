@@ -1,20 +1,126 @@
 ---
-// Placeholder page: replaced by the trail list in task 4.5.
+/**
+ * List page (task 4.5, design D6/D12): every entry that is not closed, rendered as cards on
+ * the server, with the filter island next to them.
+ *
+ * The island does not own the cards. It receives the same entries as plain data and toggles
+ * the `hidden` attribute of the <li> elements it finds by id (see src/components/filters.ts),
+ * so the complete list is readable before hydration and with JavaScript off. The
+ * "nessun risultato" block is server-rendered hidden for the same reason.
+ */
 import BaseLayout from '../layouts/BaseLayout.astro';
+import EntryCard from '../components/EntryCard.astro';
+import FilterPanel from '../components/FilterPanel';
+import { CLEAR_BUTTON_ID, COUNT_ID, EMPTY_STATE_ID, LIST_ID, type EntryListItem } from '../components/filters';
+import { formatResultCount } from '../components/format';
+import { getEntries, getTrack } from '../lib/catalog';
+import { SITE_NAME } from '../lib/site';
+
+const entries: EntryListItem[] = (await getEntries())
+  .filter((entry) => entry.data.status !== 'closed')
+  .map((entry) => {
+    const { stats } = getTrack(entry);
+    return {
+      id: entry.slug,
+      kind: entry.kind,
+      name: entry.data.name,
+      summary: entry.data.summary,
+      difficulty: entry.data.difficulty,
+      municipalities: entry.data.municipalities,
+      tags: entry.data.tags,
+      length_m: Math.round(stats.length_m),
+      ascent_m: stats.elevation ? Math.round(stats.elevation.ascent_m) : null,
+      duration_minutes: entry.data.duration_minutes ?? null,
+      url: entry.url,
+    };
+  });
+
+const description =
+  'Sentieri e percorsi escursionistici di Piateda e dei comuni confinanti: statistiche calcolate dalle tracce GPX, mappa e download.';
 ---
 
-<BaseLayout
-  title="Sentieri di Piateda"
-  description="Catalogo dei sentieri e dei percorsi escursionistici di Piateda (SO), con mappa 3D e tracce GPX scaricabili."
->
-  <div class="container">
-    <h1>Sentieri di Piateda</h1>
-    <p>Sito in costruzione: l'elenco dei sentieri arriverà con la prossima versione.</p>
+<BaseLayout title={`${SITE_NAME} · elenco dei sentieri`} description={description}>
+  <div class="elenco container">
+    <header class="elenco__intro">
+      <h1>Sentieri e percorsi</h1>
+      <p>{description}</p>
+    </header>
+
+    <div class="elenco__layout">
+      <aside class="elenco__filters" aria-label="Filtri">
+        <FilterPanel client:load entries={entries} />
+      </aside>
+
+      <div class="elenco__results">
+        <p class="elenco__count" id={COUNT_ID} aria-live="polite">{formatResultCount(entries.length)}</p>
+
+        <ul class="elenco__list" id={LIST_ID}>
+          {entries.map((entry) => <EntryCard entry={entry} />)}
+        </ul>
+
+        <div class="elenco__empty" id={EMPTY_STATE_ID} hidden>
+          <p>Nessun risultato per i filtri selezionati.</p>
+          <button type="button" id={CLEAR_BUTTON_ID}>Azzera i filtri</button>
+        </div>
+      </div>
+    </div>
   </div>
 </BaseLayout>
 
 <style>
-  .container {
-    padding-block: var(--space-6);
+  .elenco {
+    padding-block: var(--space-5);
+  }
+
+  .elenco__intro p {
+    max-width: 60ch;
+    margin-top: var(--space-2);
+    color: var(--color-text-muted);
+  }
+
+  .elenco__layout {
+    display: grid;
+    gap: var(--space-5);
+    margin-top: var(--space-5);
+  }
+
+  .elenco__count {
+    margin-bottom: var(--space-3);
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-sm);
+  }
+
+  .elenco__list {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+  }
+
+  .elenco__empty {
+    padding: var(--space-5);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-md);
+    text-align: center;
+  }
+
+  .elenco__empty button {
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  @media (min-width: 1024px) {
+    .elenco__layout {
+      grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .elenco__filters {
+      position: sticky;
+      top: calc(var(--header-height) + var(--space-4));
+    }
   }
 </style>

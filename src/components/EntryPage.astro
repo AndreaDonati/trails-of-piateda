@@ -1,0 +1,408 @@
+---
+/**
+ * Detail page of one entry (task 4.3, design D12), shared by /sentieri/ and /percorsi/:
+ * the two routes differ only in which collection they iterate and in the referenced trails.
+ *
+ * Layout: the map comes first in the document so that on mobile it sits at the top at a
+ * fixed height with a fullscreen toggle, followed by the statistics, the text and the
+ * profile. From 1024 px the same markup becomes two columns with the map sticky on the
+ * right; no element is duplicated between the two layouts.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TrackMap from './map/TrackMap';
+import ElevationProfile from './ElevationProfile.astro';
+import StatsBar from './StatsBar.astro';
+import { getTrack, KIND_PATH, type CatalogEntry } from '../lib/catalog';
+import { SITE_NAME, withBase } from '../lib/site';
+import { renderMarkdown } from './markdown';
+import { difficultyLabel, formatDate, kindDemonstrative, kindLabel } from './format';
+
+export interface Props {
+  entry: CatalogEntry;
+  /** Trails a route is composed of; empty for trails. */
+  relatedTrails?: { name: string; url: string }[];
+}
+
+const { entry, relatedTrails = [] } = Astro.props;
+const { data, kind, slug } = entry;
+
+const track = getTrack(entry);
+const description = renderMarkdown(data.description);
+const gpxUrl = withBase(`/gpx/${slug}.gpx`);
+// Base-aware: on GitHub Pages the endpoint lives under /trails-of-piateda/data/...
+const dataUrl = withBase(`/data/${KIND_PATH[kind]}/${slug}.geojson`);
+
+const statusNotice =
+  data.status === 'closed'
+    ? `${kindDemonstrative(kind)} è segnalato come chiuso: non percorrerlo finché non viene ripristinato.`
+    : data.status === 'maintenance'
+      ? `${kindDemonstrative(kind)} è in manutenzione: possono esserci tratti interrotti o segnaletica mancante.`
+      : null;
+
+const isUrl = (source: string) => /^https?:\/\//.test(source);
+---
+
+<BaseLayout title={`${data.name} · ${SITE_NAME}`} description={data.summary}>
+  <article class="entry container">
+    <header class="entry__header">
+      <p class="entry__kind">{kindLabel(kind)}</p>
+      <h1>{data.name}</h1>
+      <p class="entry__difficulty">
+        <span class="badge-difficulty" data-difficulty={data.difficulty}>{data.difficulty}</span>
+        <span>{difficultyLabel(data.difficulty)}</span>
+      </p>
+      <p class="entry__summary">{data.summary}</p>
+
+      <div class="entry__actions">
+        <a class="entry__download" href={gpxUrl} download={`${slug}.gpx`}>Scarica il GPX</a>
+        <!-- report action insertion point: the reporting wave adds the "Segnala un problema" button here -->
+      </div>
+    </header>
+
+    {
+      statusNotice && (
+        <p class="entry__notice" data-status={data.status} role="note">
+          {statusNotice}
+        </p>
+      )
+    }
+
+    <div class="entry__layout">
+      <div class="entry__map-column">
+        <div class="entry__map" id="mappa-scheda">
+          <TrackMap client:only="react" dataUrl={dataUrl} mode="detail" fit="data" height="100%" />
+          <button class="entry__fullscreen" type="button" hidden>Schermo intero</button>
+        </div>
+      </div>
+
+      <div class="entry__content">
+        <section aria-labelledby="titolo-statistiche">
+          <h2 id="titolo-statistiche">Statistiche</h2>
+          <StatsBar stats={track.stats} durationMinutes={data.duration_minutes} />
+        </section>
+
+        {
+          description && (
+            <section aria-labelledby="titolo-descrizione">
+              <h2 id="titolo-descrizione">Descrizione</h2>
+              <div class="entry__description" set:html={description} />
+            </section>
+          )
+        }
+
+        {
+          track.stats.elevation && (
+            <section aria-labelledby="titolo-profilo">
+              <h2 id="titolo-profilo">Profilo altimetrico</h2>
+              <ElevationProfile elevation={track.stats.elevation} lengthM={track.stats.length_m} />
+            </section>
+          )
+        }
+
+        <!-- gallery insertion point: the photo wave adds the thumbnails and the lightbox here -->
+
+        {
+          relatedTrails.length > 0 && (
+            <section aria-labelledby="titolo-sentieri">
+              <h2 id="titolo-sentieri">Sentieri percorsi</h2>
+              <ul class="entry__links">
+                {relatedTrails.map((trail) => (
+                  <li>
+                    <a href={trail.url}>{trail.name}</a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        }
+
+        <section aria-labelledby="titolo-scheda">
+          <h2 id="titolo-scheda">Scheda</h2>
+          <dl class="entry__meta">
+            <div>
+              <dt>Partenza</dt>
+              <dd>{data.start.name}</dd>
+            </div>
+            <div>
+              <dt>Comuni</dt>
+              <dd>{data.municipalities.join(', ')}</dd>
+            </div>
+            {
+              data.signage && (
+                <div>
+                  <dt>Segnaletica</dt>
+                  <dd>{data.signage}</dd>
+                </div>
+              )
+            }
+            {
+              data.tags.length > 0 && (
+                <div>
+                  <dt>Tag</dt>
+                  <dd>{data.tags.join(', ')}</dd>
+                </div>
+              )
+            }
+            {
+              data.verified_on && (
+                <div>
+                  <dt>Verificato il</dt>
+                  <dd>{formatDate(data.verified_on)}</dd>
+                </div>
+              )
+            }
+            {
+              data.sources.length > 0 && (
+                <div>
+                  <dt>Fonti</dt>
+                  <dd>
+                    <ul class="entry__links">
+                      {data.sources.map((source) => (
+                        <li>
+                          {isUrl(source) ? (
+                            <a href={source} rel="noopener" target="_blank">
+                              {source}
+                            </a>
+                          ) : (
+                            source
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              )
+            }
+            {
+              data.contributors.length > 0 && (
+                <div>
+                  <dt>Contributi</dt>
+                  <dd>{data.contributors.join(', ')}</dd>
+                </div>
+              )
+            }
+          </dl>
+        </section>
+
+        <!-- report panel insertion point: the reporting wave adds the panel and the map picking here -->
+      </div>
+    </div>
+  </article>
+</BaseLayout>
+
+<script>
+  // Fullscreen toggle for the map box. The button ships hidden and is revealed only where
+  // the Fullscreen API exists, so no page ever shows a control that does nothing.
+  const box = document.getElementById('mappa-scheda');
+  const button = box?.querySelector<HTMLButtonElement>('.entry__fullscreen');
+  if (box && button && typeof box.requestFullscreen === 'function') {
+    button.hidden = false;
+    button.addEventListener('click', () => {
+      if (document.fullscreenElement === box) void document.exitFullscreen();
+      else void box.requestFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => {
+      button.textContent = document.fullscreenElement === box ? 'Esci da schermo intero' : 'Schermo intero';
+    });
+  }
+</script>
+
+<style>
+  .entry {
+    padding-block: var(--space-5);
+    /* Room for the action bar, which is fixed to the bottom of the viewport on mobile. */
+    padding-bottom: var(--space-8);
+  }
+
+  .entry__kind {
+    margin-bottom: 0;
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .entry__difficulty {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-block: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .entry__summary {
+    max-width: 60ch;
+    color: var(--color-text-muted);
+  }
+
+  .entry__actions {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: var(--z-panel);
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+  }
+
+  .entry__download {
+    flex: 1 1 auto;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-strong);
+    color: var(--color-on-primary);
+    font-weight: var(--font-weight-medium);
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .entry__download:hover {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
+  .entry__notice {
+    padding: var(--space-3) var(--space-4);
+    border-left: 4px solid var(--color-status-warning);
+    border-radius: var(--radius-sm);
+    background: var(--color-status-warning-bg);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .entry__notice[data-status='closed'] {
+    border-left-color: var(--color-status-closed);
+    background: var(--color-status-closed-bg);
+  }
+
+  .entry__layout {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .entry__map {
+    position: relative;
+    /* 45 vh per design D12, but never below the island's own 320 px minimum, which would
+       otherwise be clipped by the overflow rule on short viewports. */
+    height: max(45vh, 320px);
+    overflow: hidden;
+    border-radius: var(--radius-md);
+  }
+
+  .entry__map:fullscreen {
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .entry__fullscreen {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: var(--z-panel);
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+  }
+
+  .entry__content > section + section {
+    margin-top: var(--space-6);
+  }
+
+  .entry__content h2 {
+    margin-bottom: var(--space-3);
+  }
+
+  .entry__description {
+    max-width: 68ch;
+  }
+
+  .entry__description :global(h3),
+  .entry__description :global(h4),
+  .entry__description :global(h5) {
+    margin-top: var(--space-4);
+    margin-bottom: var(--space-2);
+    font-size: var(--font-size-lg);
+  }
+
+  .entry__links {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .entry__links li + li {
+    margin-top: var(--space-1);
+  }
+
+  .entry__meta {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+  }
+
+  .entry__meta dt {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .entry__meta dd {
+    margin: 0;
+  }
+
+  @media (min-width: 768px) {
+    .entry__meta {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .entry {
+      padding-bottom: var(--space-6);
+    }
+
+    /* Desktop: the action bar becomes buttons under the title (design D12). */
+    .entry__actions {
+      position: static;
+      padding: 0;
+      margin-top: var(--space-4);
+      border-top: 0;
+      background: none;
+      box-shadow: none;
+    }
+
+    .entry__download {
+      flex: 0 0 auto;
+    }
+
+    .entry__layout {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+      align-items: start;
+      margin-top: var(--space-5);
+    }
+
+    .entry__map-column {
+      grid-column: 2;
+      grid-row: 1;
+      position: sticky;
+      top: calc(var(--header-height) + var(--space-4));
+    }
+
+    .entry__content {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .entry__map {
+      height: min(70vh, 34rem);
+    }
+  }
+</style>

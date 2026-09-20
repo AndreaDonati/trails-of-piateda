@@ -1,0 +1,213 @@
+---
+/**
+ * Elevation profile as an inline SVG generated at build time (task 4.4, design D5).
+ *
+ * Everything the reader needs — the curve, the axis labels and the aria-label summary — is
+ * in the markup; the script below only adds a hover readout of the nearest sample. Nothing
+ * is fetched or computed in the browser, and the figure is complete without JavaScript.
+ * Rendered only when the track has elevation data: the caller checks `stats.elevation`.
+ */
+import type { ElevationStats } from '../lib/gpx';
+import { buildProfile, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from './elevationProfile';
+import { formatKm, formatMetres } from './format';
+
+export interface Props {
+  elevation: ElevationStats;
+  /** Track length, used for the label at the right end of the distance axis. */
+  lengthM: number;
+}
+
+const { elevation, lengthM } = Astro.props;
+const profile = buildProfile(elevation.profile);
+
+// Compact payload for the hover script: [x, y, distance in metres, elevation in metres].
+const samples = profile ? profile.points.map((p) => [p.x, p.y, Math.round(p.d), Math.round(p.ele)]) : [];
+
+const ariaLabel = profile
+  ? `Profilo altimetrico: ${formatKm(lengthM)}, quota da ${formatMetres(profile.minEle)} a ${formatMetres(
+      profile.maxEle,
+    )}, dislivello in salita ${formatMetres(elevation.ascent_m)}.`
+  : '';
+---
+
+{
+  profile && (
+    <figure class="profile" data-samples={JSON.stringify(samples)}>
+      <svg
+        class="profile__svg"
+        viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
+        role="img"
+        aria-label={ariaLabel}
+      >
+        <line
+          class="profile__axis"
+          x1={profile.plot.left}
+          y1={profile.plot.top}
+          x2={profile.plot.right}
+          y2={profile.plot.top}
+        />
+        <line
+          class="profile__axis"
+          x1={profile.plot.left}
+          y1={profile.plot.bottom}
+          x2={profile.plot.right}
+          y2={profile.plot.bottom}
+        />
+
+        <path class="profile__area" d={profile.area} />
+        <path class="profile__line" d={profile.line} />
+
+        <text class="profile__label" x={profile.plot.left - 8} y={profile.plot.top + 4} text-anchor="end">
+          {Math.round(profile.maxEle)} m
+        </text>
+        <text class="profile__label" x={profile.plot.left - 8} y={profile.plot.bottom + 4} text-anchor="end">
+          {Math.round(profile.minEle)} m
+        </text>
+        <text class="profile__label" x={profile.plot.left} y={VIEWBOX_HEIGHT - 6}>
+          0 km
+        </text>
+        <text class="profile__label" x={profile.plot.right} y={VIEWBOX_HEIGHT - 6} text-anchor="end">
+          {formatKm(lengthM)}
+        </text>
+
+        <g class="profile__cursor" aria-hidden="true">
+          <line class="profile__cursor-line" x1="0" y1={profile.plot.top} x2="0" y2={profile.plot.bottom} />
+          <circle class="profile__cursor-dot" cx="0" cy="0" r="5" />
+        </g>
+      </svg>
+
+      <figcaption class="profile__readout" aria-live="off" hidden />
+    </figure>
+  )
+}
+
+<script>
+  /**
+   * Hover readout: progressive enhancement over the server-rendered SVG. The samples are
+   * already on the element as SVG coordinates, so finding the nearest one is a binary search
+   * over x; nothing is recomputed from the track.
+   */
+  type Sample = [x: number, y: number, distanceM: number, elevationM: number];
+
+  const nf1 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const nf0 = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 });
+
+  function nearest(samples: Sample[], x: number): Sample {
+    let lo = 0;
+    let hi = samples.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if ((samples[mid] as Sample)[0] < x) lo = mid;
+      else hi = mid;
+    }
+    const a = samples[lo] as Sample;
+    const b = samples[hi] as Sample;
+    return Math.abs(a[0] - x) <= Math.abs(b[0] - x) ? a : b;
+  }
+
+  function setup(figure: HTMLElement): void {
+    const svg = figure.querySelector<SVGSVGElement>('.profile__svg');
+    const cursor = figure.querySelector<SVGGElement>('.profile__cursor');
+    const line = figure.querySelector<SVGLineElement>('.profile__cursor-line');
+    const dot = figure.querySelector<SVGCircleElement>('.profile__cursor-dot');
+    const readout = figure.querySelector<HTMLElement>('.profile__readout');
+    if (!svg || !cursor || !line || !dot || !readout) return;
+
+    let samples: Sample[];
+    try {
+      samples = JSON.parse(figure.dataset.samples ?? '[]') as Sample[];
+    } catch {
+      return;
+    }
+    if (samples.length < 2) return;
+
+    const viewBoxWidth = svg.viewBox.baseVal.width;
+
+    const move = (event: PointerEvent) => {
+      const box = svg.getBoundingClientRect();
+      if (box.width === 0) return;
+      const sample = nearest(samples, ((event.clientX - box.left) / box.width) * viewBoxWidth);
+      line.setAttribute('x1', String(sample[0]));
+      line.setAttribute('x2', String(sample[0]));
+      dot.setAttribute('cx', String(sample[0]));
+      dot.setAttribute('cy', String(sample[1]));
+      readout.textContent = `${nf1.format(sample[2] / 1000)} km · ${nf0.format(sample[3])} m`;
+      readout.hidden = false;
+      figure.classList.add('is-hovering');
+    };
+    const leave = () => {
+      figure.classList.remove('is-hovering');
+      readout.hidden = true;
+    };
+
+    svg.addEventListener('pointermove', move);
+    svg.addEventListener('pointerleave', leave);
+  }
+
+  document.querySelectorAll<HTMLElement>('.profile').forEach(setup);
+</script>
+
+<style>
+  .profile {
+    margin: 0;
+  }
+
+  .profile__svg {
+    width: 100%;
+    /* Same ratio as the viewBox, so client x maps to user units without correction. */
+    aspect-ratio: 1000 / 260;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+    touch-action: pan-y;
+  }
+
+  .profile__area {
+    fill: var(--color-primary);
+    fill-opacity: 0.18;
+  }
+
+  .profile__line {
+    fill: none;
+    stroke: var(--color-primary-strong);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+
+  .profile__axis {
+    stroke: var(--color-border-strong);
+    stroke-width: 1;
+  }
+
+  .profile__label {
+    fill: var(--color-text-muted);
+    font-family: var(--font-family-sans);
+    font-size: 20px;
+  }
+
+  .profile__cursor {
+    visibility: hidden;
+  }
+
+  .profile.is-hovering .profile__cursor {
+    visibility: visible;
+  }
+
+  .profile__cursor-line {
+    stroke: var(--color-text-subtle);
+    stroke-width: 1.5;
+  }
+
+  .profile__cursor-dot {
+    fill: var(--color-primary-strong);
+    stroke: var(--color-surface);
+    stroke-width: 2;
+  }
+
+  .profile__readout {
+    margin-top: var(--space-1);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

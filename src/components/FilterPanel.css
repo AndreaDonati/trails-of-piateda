@@ -1,0 +1,102 @@
+/*
+ * Styles of the filter island. React components cannot use Astro scoped styles, so this
+ * file is imported by FilterPanel.tsx; like every other stylesheet it may only use the
+ * custom properties declared in tokens.css.
+ *
+ * Mobile: one horizontal, scrollable chip row per group (design D12).
+ * From 1024 px the panel is the left sidebar of the list page and the chips wrap.
+ */
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.filters__search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.filters__search label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.filters__search input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.filters__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filters__group legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.filters__chips {
+  display: flex;
+  gap: var(--space-2);
+  /* Mobile: the row scrolls instead of wrapping, so the list stays close to the top. */
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.filters__chip {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.filters__chip:hover {
+  border-color: var(--color-primary);
+}
+
+.filters__chip[aria-pressed='true'] {
+  border-color: var(--color-primary-strong);
+  background: var(--color-primary-strong);
+  color: var(--color-on-primary);
+}
+
+.filters__reset {
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.filters__reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (min-width: 1024px) {
+  .filters__chips {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
