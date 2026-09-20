@@ -3,8 +3,8 @@
 ## 1. Repository and publishing skeleton
 
 - [ ] 1.1 Authenticate `gh` against `github.com` for the personal account (`gh auth login --hostname github.com`) and verify with `gh auth status` that github.com is listed alongside the enterprise host
-- [ ] 1.2 Initialise git in the project folder, add `.gitignore` (node, dist, .astro), `LICENSE` (MIT) and `LICENSE-DATA` (CC BY 4.0), and verify `git status` shows only intended files
-- [ ] 1.3 Scaffold an Astro project with TypeScript (strict), the React integration and `output: 'static'`; set `site`/`base` from `SITE_URL`/`BASE_PATH` env vars with local defaults; verify `npm run build` produces `dist/index.html`
+- [x] 1.2 Initialise git in the project folder, add `.gitignore` (node, dist, .astro), `LICENSE` (MIT) and `LICENSE-DATA` (CC BY 4.0), and verify `git status` shows only intended files
+- [x] 1.3 Scaffold an Astro project with TypeScript (strict), the React integration and `output: 'static'`; set `site`/`base` from `SITE_URL`/`BASE_PATH` env vars with local defaults; verify `npm run build` produces `dist/index.html`
 - [ ] 1.4 Create the public repository `trails-of-piateda` on the personal account, set `origin`, verify `git remote -v` points to `github.com`, and push `main`
 - [ ] 1.5 Add `.github/workflows/pages.yml` with a `build` job (on `pull_request` and `push` to `main`: `npm ci`, `npm test`, `npm run build`, upload Pages artifact) and a `deploy` job (`push` to `main` only, `actions/deploy-pages`); enable Pages with source "GitHub Actions"; verify the placeholder page is live at `https://<owner>.github.io/trails-of-piateda/`
 - [ ] 1.6 Enable branch protection on `main` requiring PRs and the `build` check, add `.github/dependabot.yml` (npm, monthly); verify by opening a throwaway PR that the check runs and is required
