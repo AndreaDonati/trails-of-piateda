@@ -37,8 +37,17 @@ export const EMPTY_FILTERS: FilterState = { kind: '', difficulty: '', municipali
 /** Query-string keys. `municipality` and `kind` are fixed by the spec scenarios. */
 export const PARAM = { kind: 'kind', difficulty: 'difficulty', municipality: 'municipality', q: 'q' } as const;
 
-const KINDS: readonly TrackKind[] = ['trail', 'route'];
-const DIFFICULTIES: readonly Difficulty[] = ['T', 'E', 'EE', 'EEA'];
+/** The two kinds, in the order the chips show them. Also the values accepted in the URL. */
+export const KINDS: readonly TrackKind[] = ['trail', 'route'];
+
+/**
+ * Must stay equal to `DIFFICULTIES` in src/content.config.ts, which is the authoritative
+ * list. It is not imported from there because that module pulls in `astro:content`,
+ * `astro/loaders` and node:fs, and runs the catalog layout check at import time — none of
+ * which belongs in the client bundle of this island. tests/filters.test.ts asserts the two
+ * lists are identical, so a fifth difficulty cannot be added in one place only.
+ */
+export const DIFFICULTIES: readonly Difficulty[] = ['T', 'E', 'EE', 'EEA'];
 
 /** Case- and accent-insensitive comparison, so "Montagna" matches "montagna". */
 function normalise(value: string): string {
@@ -49,6 +58,14 @@ function normalise(value: string): string {
     .toLowerCase();
 }
 
+/**
+ * Municipality comparison, used both by `matches` and by the pressed state of the chips, so
+ * that `?municipality=piateda` filters the list and highlights the Piateda chip.
+ */
+export function sameMunicipality(a: string, b: string): boolean {
+  return normalise(a) === normalise(b);
+}
+
 export function isEmpty(filters: FilterState): boolean {
   return !filters.kind && !filters.difficulty && !filters.municipality && !filters.q.trim();
 }
@@ -56,9 +73,8 @@ export function isEmpty(filters: FilterState): boolean {
 export function matches(entry: EntryListItem, filters: FilterState): boolean {
   if (filters.kind && entry.kind !== filters.kind) return false;
   if (filters.difficulty && entry.difficulty !== filters.difficulty) return false;
-  if (filters.municipality) {
-    const wanted = normalise(filters.municipality);
-    if (!entry.municipalities.some((m) => normalise(m) === wanted)) return false;
+  if (filters.municipality && !entry.municipalities.some((m) => sameMunicipality(m, filters.municipality))) {
+    return false;
   }
   const text = normalise(filters.q);
   if (text) {

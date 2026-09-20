@@ -14,6 +14,19 @@ export function formatAscentM(ascentM: number | undefined | null): string {
   return `${metres.format(ascentM)} m`;
 }
 
+/**
+ * Photo count of an entry for the overview panel (design D10: the overview carries the count
+ * and nothing else about photos). "foto" is invariable in Italian, so only zero changes the
+ * wording. Returns null when the feature has no usable count, and the panel then shows no line:
+ * the detail data has no `photos` property at all.
+ */
+export function formatPhotoCount(count: unknown): string | null {
+  if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) return null;
+  const whole = Math.floor(count);
+  // No thousands separator: the count is capped at 12 photos per entry (design D10).
+  return whole === 0 ? 'Nessuna foto' : `${whole} foto`;
+}
+
 export function kindLabel(kind: unknown): string {
   return typeof kind === 'string' && kind in KIND_LABELS ? KIND_LABELS[kind as TrackKind] : '';
 }

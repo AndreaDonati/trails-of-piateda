@@ -58,7 +58,7 @@ Alternative discarded: one big `trails.json` index plus a `gpx/` folder. Merge c
 
 ### D3. GPX processing at build time inside Astro, no separate pre-build step
 
-A `src/lib/gpx.ts` module parses `track.gpx` (`@tmcw/togeojson` over `@xmldom/xmldom`), validates it (GPX 1.1, ≥1 `<trk>`, ≥2 points, all points within the area-of-interest bbox), and computes statistics: haversine length, elevation smoothed with a moving median/average over a fixed window before summing ascent/descent, min/max elevation, bbox, and a profile resampled at a fixed distance step. Results are memoised per entry during a build.
+A `src/lib/gpx.ts` module parses `track.gpx` (reading the DOM from `@xmldom/xmldom` by local element name, so a namespace-prefixed GPX is accepted; `@tmcw/togeojson` was dropped during implementation because it matches qualified names only), validates it (GPX 1.1, ≥1 `<trk>`, ≥2 points, all points within the area-of-interest bbox), and computes statistics: haversine length, elevation smoothed with a moving median/average over a fixed window before summing ascent/descent, min/max elevation, bbox, and a profile resampled at a fixed distance step. Results are memoised per entry during a build.
 
 Outputs are produced as Astro static endpoints, so they are ordinary files in `dist/`:
 - `data/<kind>/<slug>.geojson`: full-resolution LineString plus waypoints, used by detail maps.

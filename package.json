@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@astrojs/react": "^6.0.6",
-    "@tmcw/togeojson": "^7.1.2",
     "@turf/helpers": "^7.4.0",
     "@turf/simplify": "^7.4.0",
     "@xmldom/xmldom": "^0.9.12",

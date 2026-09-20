@@ -31,6 +31,24 @@ describe('parseGpx validation', () => {
     expect(parseGpx(read(fixture('known.gpx')), 'known').points.length).toBe(11);
   });
 
+  it('accepts the GPX namespace bound to a prefix, like the default-namespace form', () => {
+    const prefixed = parseGpx(read(fixture('prefixed-ns.gpx')), 'prefixed');
+    const plain = parseGpx(read(fixture('known.gpx')), 'known');
+    expect(prefixed.points).toEqual(plain.points.slice(0, 6));
+    expect(prefixed.waypoints.features[0]?.properties.name).toBe('Partenza');
+    expect(prefixed.waypoints.features[0]?.geometry.coordinates).toEqual([9.93, 46.16]);
+  });
+
+  it('still reports a prefixed file that has no <trk> as having none', () => {
+    const rteOnly = `<?xml version="1.0"?>
+      <g:gpx xmlns:g="http://www.topografix.com/GPX/1/1" version="1.1">
+        <g:rte><g:rtept lat="46.160" lon="9.930"/><g:rtept lat="46.161" lon="9.930"/></g:rte>
+      </g:gpx>`;
+    expect(() => parseGpx(rteOnly, 'p')).toThrow(
+      /^p: at least one <trk> track is required \(the file only has <rte> routes\)/,
+    );
+  });
+
   it('rejects a file with only <rte>, explaining that <trk> is required', () => {
     expect(() => parseGpx(read(fixture('rte-only.gpx')), 'x/rte-only.gpx')).toThrow(
       /^x\/rte-only\.gpx: at least one <trk> track is required \(the file only has <rte> routes\)/,
@@ -116,6 +134,53 @@ describe('computeStats', () => {
   });
 });
 
+describe('long tracks', () => {
+  /**
+   * A 1 Hz recording of a multi-day route reaches this many points, and the spec accepts it.
+   * The track is built in memory: committing a 150 000 point GPX would be about 10 MB of
+   * fixture for a property that is about the point count and nothing else.
+   *
+   * Above roughly 100 000 arguments a spread call (`Math.min(...points)`) overflows the stack,
+   * so this size is what makes the test meaningful; anything in the module that scales with the
+   * point count other than by iterating over it fails here.
+   */
+  const N = 150_000;
+  const points = Array.from({ length: N }, (_, i) => {
+    const t = i / (N - 1);
+    return {
+      // A climb across the area of interest with switchbacks and metre-scale GPS jitter, so the
+      // simplification has real work to do instead of collapsing the track to two points.
+      lon: 9.7 + t * 0.3 + Math.sin(i * 0.37) * 2e-5,
+      lat: 46.0 + t * 0.3 + Math.cos(i * 0.11) * 3e-5,
+      ele: 300 + t * 2200 + Math.sin(i * 0.23) * 4,
+    };
+  });
+
+  it('computes statistics without a stack overflow, with the same min/max as a plain scan', () => {
+    const stats = computeStats(points, 'long');
+    const smoothed = smooth(points.map((p) => p.ele));
+    let min = Infinity;
+    let max = -Infinity;
+    for (const e of smoothed) {
+      if (e < min) min = e;
+      if (e > max) max = e;
+    }
+    expect(stats.elevation?.min_m).toBe(min);
+    expect(stats.elevation?.max_m).toBe(max);
+    expect(stats.elevation?.ascent_m).toBeGreaterThan(2200);
+    expect(stats.length_m).toBeGreaterThan(30_000);
+    expect(stats.bbox.every(Number.isFinite)).toBe(true);
+    // The profile is sampled by distance, so it stays small however dense the recording is.
+    expect(stats.elevation!.profile.length).toBeLessThan(N / 10);
+  });
+
+  it('simplifies without a stack overflow', () => {
+    const simplified = simplifyLine(points).coordinates;
+    expect(simplified.length).toBeGreaterThan(2);
+    expect(simplified.length).toBeLessThan(points.length);
+  });
+});
+
 describe('tracks without <ele>', () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -183,6 +248,14 @@ describe('simplifyLine', () => {
     }
     expect(simplified[0]).toEqual([points[0]!.lon, points[0]!.lat]);
     expect(simplified.at(-1)).toEqual([points.at(-1)!.lon, points.at(-1)!.lat]);
+  });
+});
+
+describe('loadTrack error reporting', () => {
+  it('reports a validation failure once, prefixed with the file, not wrapped a second time', () => {
+    expect(() => loadTrack(fixture('rte-only.gpx'))).toThrow(
+      new RegExp(`^${fixture('rte-only.gpx').replace(/[.]/g, '\\.')}: at least one <trk> track is required`),
+    );
   });
 });
 

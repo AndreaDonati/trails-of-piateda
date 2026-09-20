@@ -12,26 +12,26 @@
  * can be shared, and read back from it on load.
  */
 import { useEffect, useRef, useState } from 'react';
-import { DIFFICULTY_LABELS, KIND_LABELS, type Difficulty, type TrackKind } from '../lib/mapConfig';
+import { DIFFICULTY_LABELS, KIND_LABELS } from '../lib/mapConfig';
 import { formatResultCount } from './format';
 import {
   applyFilters,
   cardElementId,
   CLEAR_BUTTON_ID,
   COUNT_ID,
+  DIFFICULTIES,
   EMPTY_FILTERS,
   EMPTY_STATE_ID,
   filtersToSearch,
   isEmpty,
+  KINDS,
   municipalityOptions,
   parseFilters,
+  sameMunicipality,
   type EntryListItem,
   type FilterState,
 } from './filters';
 import './FilterPanel.css';
-
-const KINDS: TrackKind[] = ['trail', 'route'];
-const DIFFICULTIES: Difficulty[] = ['T', 'E', 'EE', 'EEA'];
 
 export interface FilterPanelProps {
   entries: EntryListItem[];
@@ -56,13 +56,18 @@ export default function FilterPanel({ entries }: FilterPanelProps) {
       const card = document.getElementById(cardElementId(entry.id));
       if (card) card.hidden = !visible.has(entry.id);
     }
+    // "Nessun risultato per i filtri selezionati" is only true when a filter is what excludes
+    // the entries; an empty catalog is not a failed search, so the block stays hidden and the
+    // count alone reports the zero.
     const empty = document.getElementById(EMPTY_STATE_ID);
-    if (empty) empty.hidden = visible.size > 0;
+    if (empty) empty.hidden = visible.size > 0 || isEmpty(filters);
     const count = document.getElementById(COUNT_ID);
     if (count) count.textContent = formatResultCount(visible.size);
 
+    // pathname + search + hash rather than `search || pathname`: the latter dropped the
+    // fragment, so filtering while reading an anchored section lost the anchor from the URL.
     const search = filtersToSearch(filters);
-    window.history.replaceState(null, '', search || window.location.pathname);
+    window.history.replaceState(null, '', `${window.location.pathname}${search}${window.location.hash}`);
   }, [entries, filters]);
 
   // The "azzera i filtri" button lives inside the server-rendered empty state, which belongs
@@ -77,8 +82,13 @@ export default function FilterPanel({ entries }: FilterPanelProps) {
 
   const municipalities = municipalityOptions(entries);
   const active = !isEmpty(filters);
-  const toggle = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
+  const toggle = <K extends 'kind' | 'difficulty'>(key: K, value: FilterState[K]) =>
     setFilters((current) => ({ ...current, [key]: current[key] === value ? '' : value }));
+  const toggleMunicipality = (value: string) =>
+    setFilters((current) => ({
+      ...current,
+      municipality: sameMunicipality(current.municipality, value) ? '' : value,
+    }));
 
   return (
     <form className="filters" role="search" aria-label="Filtra l'elenco" onSubmit={(e) => e.preventDefault()}>
@@ -122,8 +132,10 @@ export default function FilterPanel({ entries }: FilterPanelProps) {
             <Chip
               key={municipality}
               label={municipality}
-              pressed={filters.municipality === municipality}
-              onClick={() => toggle('municipality', municipality)}
+              // Compared the way the predicate compares it, so `?municipality=piateda`
+              // shows the Piateda chip pressed instead of no chip at all.
+              pressed={sameMunicipality(filters.municipality, municipality)}
+              onClick={() => toggleMunicipality(municipality)}
             />
           ))}
         </ChipGroup>

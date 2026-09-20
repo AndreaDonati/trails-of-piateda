@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkCatalogLayout, entryUrl, SLUG_PATTERN } from '../src/lib/catalog';
+import { checkCatalogLayout, entryUrl, getPhotos, SLUG_PATTERN, type CatalogEntry } from '../src/lib/catalog';
 
 const fixture = (name: string) => `tests/fixtures/layout/${name}`;
 
@@ -64,5 +64,31 @@ describe('entryUrl', () => {
   it('accepts the site base with or without trailing slash', () => {
     expect(entryUrl('trail', 'x', '/trails-of-piateda/')).toBe('/trails-of-piateda/sentieri/x/');
     expect(entryUrl('trail', 'x', '/trails-of-piateda')).toBe('/trails-of-piateda/sentieri/x/');
+  });
+});
+
+describe('getPhotos', () => {
+  // getOverview counts the photos of every entry, and the detail page, the list page and the
+  // /photos/ endpoint derive the same photos again. They must share one derivation per build,
+  // which they only do if catalog.ts hands loadPhotos arguments that produce the same cache key
+  // every time: a per-call `base`, or metadata rebuilt into a different shape, would silently
+  // defeat the memoisation and make every build decode the files several times.
+  //
+  // The entry used here has no photos/ directory, so the assertion is about the key and not
+  // about the derivation itself, which tests/photos.test.ts covers on real files.
+  const entry = {
+    kind: 'route',
+    slug: 'anello-piateda-alta',
+    url: '/percorsi/anello-piateda-alta/',
+    dir: 'content/routes/anello-piateda-alta',
+    data: { photos: [] },
+  } as unknown as CatalogEntry;
+
+  it('derives the photos of an entry once per build', async () => {
+    const first = await getPhotos(entry);
+    expect(first).toEqual([]);
+    expect(await getPhotos(entry)).toBe(first);
+    // A distinct CatalogEntry object for the same entry, as getEntries() builds on every call.
+    expect(await getPhotos({ ...entry })).toBe(first);
   });
 });

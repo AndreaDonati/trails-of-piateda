@@ -2,10 +2,16 @@
  * MapLibre map island (tasks 5.2, 5.3; design D4). Used as
  * `<TrackMap client:only="react" ... />` so MapLibre never runs at build time.
  *
- * Extension points for later features (photo markers, report picking): the
- * `map:ready` CustomEvent on `document` hands out the map instance, and the
- * marker / popup / interaction code lives in the small functions below so new
- * behaviour is added as another function rather than by editing the effect.
+ * Structure: the effect below creates the map once per mount and, on `load`, calls one
+ * `attach*` / `add*` function per behaviour (tracks, detail markers, photo markers, report
+ * picking); each returns its own teardown where it registers listeners outside the map.
+ * The `map:ready` CustomEvent on `document` hands the map instance to code outside the
+ * island (the fullscreen button on the detail page).
+ *
+ * The effect must not re-run on a state change: re-running destroys the map and rebuilds it,
+ * which re-fetches the data, reloads the tiles and throws away the visitor's camera. Every
+ * value in its dependency array is either a primitive prop or an array the caller keeps
+ * stable; see the comment on the array itself.
  */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -45,7 +51,15 @@ import {
 import { PHOTO_SELECT_EVENT, photoSelectEvent, type PhotoMarker, type PhotoSelectDetail } from '../gallery';
 import type { ReportPickDetail, ReportPointDetail } from '../../lib/reportForm';
 import { isWebGLAvailable } from './webgl';
-import { difficultyLabel, formatAscentM, formatLengthKm, isDifficulty, kindLabel } from './format';
+import {
+  difficultyLabel,
+  formatAscentM,
+  formatLengthKm,
+  formatPhotoCount,
+  isDifficulty,
+  kindLabel,
+} from './format';
+import { classifyDemError, shouldDropTerrain } from './terrain';
 import {
   collectionBounds,
   isLineFeature,
@@ -72,8 +86,19 @@ export interface TrackMapProps {
   /**
    * Photos of the entry, in track order. Drawn as camera markers in `detail` mode only; the
    * overview map is never given any (design D10), and passing them there would draw nothing.
+   *
+   * The array identity is a dependency of the map effect: a new array rebuilds the map. Pass
+   * a value computed once (an island prop is), never an inline literal from a render.
    */
   photos?: readonly PhotoMarker[];
+  /**
+   * Answer `report:pick` from the report panel with a movable report marker and `report:point`.
+   * Only the detail page sets it, and only when the form is configured, so a build without the
+   * `PUBLIC_REPORT_FORM_*` variables installs no reporting listener (spec `trail-browsing`,
+   * "Form not configured"). The island never reads the environment itself: it is client code,
+   * and the page already decides whether the report action exists at all.
+   */
+  reportPicking?: boolean;
 }
 
 /** Payload of the `map:ready` event dispatched on `document` once layers are added. */
@@ -95,6 +120,14 @@ type Status = 'loading' | 'ready' | 'unsupported';
 const UNSUPPORTED_MESSAGE = 'La mappa interattiva non è disponibile su questo browser.';
 const FIT_PADDING = 48;
 const INTERACTIVE_LAYERS: string[] = [LAYER_IDS.trail, LAYER_IDS.route];
+const DEM_SOURCE_IDS: ReadonlySet<string> = new Set([SOURCE_IDS.terrain, SOURCE_IDS.hillshade]);
+
+/**
+ * Default of the `photos` prop. A module-level constant, not `photos = []` in the parameter
+ * list: a default parameter builds a new array on every render, and the array is a dependency
+ * of the map effect, so the map would be destroyed and rebuilt on every state change.
+ */
+const NO_PHOTOS: readonly PhotoMarker[] = Object.freeze([]);
 
 /** Italian UI strings for MapLibre's built-in controls. */
 const LOCALE: Record<string, string> = {
@@ -139,24 +172,35 @@ function toLngLat(position: Position): [number, number] {
 // --- Degradation (task 5.3) -------------------------------------------------------------
 
 /**
- * Once the DEM source fails (TileJSON unreachable, network error on tiles),
- * settle the map in 2D: drop terrain, hillshade and the terrain toggle so the
- * user cannot re-enable a source that will fail again. MapLibre does not fire
- * `error` for 404 tiles, so this only reacts to real outages.
+ * Settle the map in 2D when the DEM is unusable: drop terrain, hillshade and the terrain
+ * toggle, so the visitor cannot re-enable a source that will fail again (spec
+ * `interactive-map`, "Terrain tiles unreachable").
+ *
+ * This is one-way and permanent for the session, so it must not trigger on a single bad
+ * tile. `classifyDemError` in ./terrain tells the two cases apart and documents what
+ * MapLibre 6 reports: a tile that 404s fires no `error` at all (the parent tile is drawn
+ * instead), a TileJSON failure fires an event with no `tile`, any other tile failure fires
+ * one with a `tile`. Only the first, or a run of tile failures, gives the terrain up.
  */
 function attachDemFailureHandler(map: MapLibreMap, terrainControl: TerrainControl): void {
-  const demSources = new Set<string>([SOURCE_IDS.terrain, SOURCE_IDS.hillshade]);
-  let handled = false;
+  let tileFailures = 0;
+  let dropped = false;
   map.on('error', (e) => {
-    const { sourceId, error } = e as ErrorEvent & { sourceId?: string };
-    if (!sourceId || !demSources.has(sourceId)) {
+    const event = e as ErrorEvent & { sourceId?: string; tile?: unknown };
+    const failure = classifyDemError(event, DEM_SOURCE_IDS);
+    if (failure === 'none') {
       // Adding a listener silences MapLibre's default console output; keep it for other errors.
-      console.error(error ?? e);
+      console.error(event.error ?? e);
       return;
     }
-    if (handled) return;
-    handled = true;
-    console.warn('[TrackMap] terrain data unavailable, rendering in 2D:', error?.message);
+    if (dropped) return;
+    if (failure === 'tile') tileFailures += 1;
+    if (!shouldDropTerrain(failure, tileFailures)) {
+      console.warn('[TrackMap] a terrain tile failed to load:', event.error?.message);
+      return;
+    }
+    dropped = true;
+    console.warn('[TrackMap] terrain data unavailable, rendering in 2D:', event.error?.message);
     map.setTerrain(null);
     if (map.getLayer(LAYER_IDS.hillshade)) map.removeLayer(LAYER_IDS.hillshade);
     if (map.hasControl(terrainControl)) map.removeControl(terrainControl);
@@ -318,14 +362,38 @@ function createPhotoMarkerElement(photo: PhotoMarker, index: number): HTMLButton
 }
 
 /**
- * One marker per photo, plus the two halves of the `photo:select` contract (design D10):
- * a click dispatches the event so the gallery opens its lightbox, and an event from the
- * gallery highlights the matching marker. Returns the listener teardown.
+ * Id carried by a `photo:select` event, or null for "nothing is selected".
+ *
+ * `PhotoSelectDetail.id` is still declared `string` in src/components/gallery.ts. The clear
+ * signal needs it to be `string | null`, which is that module's change to make; until then the
+ * value is read through this widening, which also absorbs an event dispatched with no detail.
+ */
+function selectedPhotoId(detail: PhotoSelectDetail | undefined): string | null {
+  const id = (detail as { id?: string | null } | undefined)?.id;
+  return typeof id === 'string' && id !== '' ? id : null;
+}
+
+/**
+ * One marker per photo, plus both halves of the `photo:select` contract (design D10).
+ *
+ * Map → gallery: a marker click focuses its own button and then dispatches
+ * `{ id, source: 'map' }`. The focus call is what lets the gallery restore focus afterwards:
+ * it captures `document.activeElement` when it opens or updates the lightbox, and a click does
+ * not focus a button in every browser (Safari does not), so without it the opener would be
+ * whatever had focus before — the previous marker, or nothing at all when the lightbox was
+ * already open.
+ *
+ * Gallery → map: `{ id, source: 'gallery' }` highlights the marker of that photo, and
+ * `{ id: null, source: 'gallery' }` clears the highlight. The gallery dispatches the second
+ * one when the lightbox closes; without it a marker would stay highlighted over a closed
+ * lightbox. An id that matches no marker also clears, since nothing here is selected then.
+ *
+ * Returns the listener teardown.
  */
 function addPhotoMarkers(map: MapLibreMap, photos: readonly PhotoMarker[], sink: Marker[]): () => void {
   const elements = new Map<string, HTMLElement>();
 
-  const highlight = (id: string) => {
+  const highlight = (id: string | null) => {
     for (const [photoId, el] of elements) el.classList.toggle('track-marker--selected', photoId === id);
   };
 
@@ -335,6 +403,7 @@ function addPhotoMarkers(map: MapLibreMap, photos: readonly PhotoMarker[], sink:
       // Without this the map click handler would also run and clear the track selection.
       event.stopPropagation();
       highlight(photo.id);
+      element.focus();
       document.dispatchEvent(photoSelectEvent({ id: photo.id, source: 'map' }));
     });
     elements.set(photo.id, element);
@@ -344,9 +413,12 @@ function addPhotoMarkers(map: MapLibreMap, photos: readonly PhotoMarker[], sink:
   const onSelect = (event: CustomEvent<PhotoSelectDetail>) => {
     // Our own click already highlighted the marker; reacting here would be the return leg of
     // a gallery ↔ map loop.
-    if (event.detail.source === 'map') return;
-    const photo = photos.find((p) => p.id === event.detail.id);
-    if (!photo) return;
+    if (event.detail?.source === 'map') return;
+    const photo = photos.find((p) => p.id === selectedPhotoId(event.detail));
+    if (!photo) {
+      highlight(null);
+      return;
+    }
     highlight(photo.id);
     // Pan only when the marker is off screen, so selecting a visible photo does not move the map.
     if (!map.getBounds().contains([photo.lon, photo.lat])) map.panTo([photo.lon, photo.lat]);
@@ -427,13 +499,13 @@ export default function TrackMap({
   fit,
   height = '60vh',
   legend,
-  photos = [],
+  photos = NO_PHOTOS,
+  reportPicking = false,
 }: TrackMapProps) {
   const terrainEnabled = terrain ?? mode === 'overview';
   const showLegend = legend ?? mode === 'overview';
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MapLibreMap | null>(null);
   const [status, setStatus] = useState<Status>('loading');
   const [dataError, setDataError] = useState<string | null>(null);
   const [selected, setSelected] = useState<TrackProperties | null>(null);
@@ -480,7 +552,6 @@ export default function TrackMap({
         ...(bounds ? { bounds, fitBoundsOptions: { padding: FIT_PADDING } } : {}),
       });
       map = created;
-      mapRef.current = created;
 
       created.addControl(new AttributionControl({ compact: false }), 'bottom-right');
       created.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
@@ -494,7 +565,9 @@ export default function TrackMap({
         addTrackLayers(created, data);
         attachTrackInteraction(created, mode === 'overview' ? setSelected : undefined);
         if (mode === 'detail') addDetailMarkers(created, data, markers);
-        if (mode === 'detail') detachReportPicking = attachReportPicking(created);
+        // Only where the page says the report form is configured: with no panel to talk to,
+        // the listener and its marker would be behaviour reachable by a stray `report:pick`.
+        if (mode === 'detail' && reportPicking) detachReportPicking = attachReportPicking(created);
         // Photo markers are a detail-page feature; the overview is given no photo data at all.
         if (mode === 'detail' && photos.length > 0) detachPhotos = addPhotoMarkers(created, photos, markers);
         setStatus('ready');
@@ -513,14 +586,24 @@ export default function TrackMap({
       detachPhotos?.();
       markers.forEach((m) => m.remove());
       map?.remove();
-      mapRef.current = null;
     };
-  }, [dataUrl, mode, terrainEnabled, exaggeration, fit, photos]);
+    // Everything here rebuilds the map from scratch, so the list must hold only values that
+    // are stable across renders: the props are primitives except `photos`, whose identity the
+    // caller keeps (the default is the frozen NO_PHOTOS, not a fresh literal). `setSelected`
+    // and `setStatus` are React setters, stable by contract, and are deliberately not listed.
+  }, [dataUrl, mode, terrainEnabled, exaggeration, fit, photos, reportPicking]);
 
-  // The side panel takes width from the map on desktop; MapLibre only watches window resizes.
-  useEffect(() => {
-    mapRef.current?.resize();
-  }, [selected]);
+  /*
+   * No effect resizes the map when the selection panel opens or closes. On desktop the panel
+   * is a flex sibling that takes width from `.track-map__canvas`, which is the element given
+   * to MapLibre, and MapLibre 6 observes its container: `Map._setupResizeObserver`
+   * (node_modules/maplibre-gl/src/ui/map.ts) attaches a ResizeObserver whose callback calls
+   * `resize()` and `redraw()` while `trackResize` is true, which is the default. The callback
+   * is throttled at 50 ms on the trailing edge only after a first immediate call, so the first
+   * change of the container box is handled in the same frame, before paint — earlier than a
+   * React effect could. On mobile the panel is absolutely positioned and the canvas box does
+   * not change at all.
+   */
 
   if (status === 'unsupported') {
     return (
@@ -581,6 +664,9 @@ function Legend({ defaultOpen }: { defaultOpen: boolean }) {
 
 function SelectionPanel({ track, onClose }: { track: TrackProperties; onClose: () => void }) {
   const difficulty = isDifficulty(track.difficulty) ? track.difficulty : undefined;
+  // The overview data carries the count of the entry's photos and nothing else about them
+  // (design D10); it is what tells the visitor whether the detail page is worth a look.
+  const photoCount = formatPhotoCount(track.photos);
   return (
     <aside className="track-map__panel" aria-label="Traccia selezionata">
       <button type="button" className="track-map__close" onClick={onClose} aria-label="Chiudi il pannello">
@@ -606,6 +692,7 @@ function SelectionPanel({ track, onClose }: { track: TrackProperties; onClose: (
           <dd>{formatAscentM(track.ascent_m)}</dd>
         </div>
       </dl>
+      {photoCount && <p className="track-map__photos">{photoCount}</p>}
       {track.url && (
         <a className="track-map__cta" href={track.url}>
           Apri la scheda

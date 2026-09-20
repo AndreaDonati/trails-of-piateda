@@ -163,8 +163,14 @@ export interface OverviewProperties {
   ascent_m: number | null;
   url: string;
   /**
-   * Number of photos of the entry. Only the count: the overview map shows no photos, and
-   * carrying their positions here would grow the single overview request for nothing (design D10).
+   * Number of photos of the entry, shown in the side panel of the overview map so a visitor can
+   * see which entries are illustrated before opening one. Only the count: the positions and the
+   * thumbnails belong to the detail page, and carrying them here would grow the single overview
+   * request every visitor downloads (design D10).
+   *
+   * Computing it costs nothing extra in a build: `getPhotos` is memoised per entry (see
+   * photos.ts), and the detail pages, the list page and the /photos/ endpoint derive the same
+   * photos anyway, so the overview endpoint reuses whichever of them ran first.
    */
   photos: number;
 }

@@ -9,6 +9,12 @@ export type TrackProperties = {
   length_m?: number;
   ascent_m?: number;
   url?: string;
+  /**
+   * Number of photos of the entry, written by `getOverview` (`OverviewProperties.photos`).
+   * Present in the overview data only: the detail map gets the photos themselves as props
+   * (design D10), so the selection panel treats a missing value as "unknown" and shows nothing.
+   */
+  photos?: number;
 };
 
 export type LineFeature = Feature<LineString | MultiLineString, TrackProperties>;

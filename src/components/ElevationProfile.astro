@@ -8,8 +8,8 @@
  * Rendered only when the track has elevation data: the caller checks `stats.elevation`.
  */
 import type { ElevationStats } from '../lib/gpx';
-import { buildProfile, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from './elevationProfile';
-import { formatKm, formatMetres } from './format';
+import { buildProfile, profileLabels, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from './elevationProfile';
+import { formatKm } from './format';
 
 export interface Props {
   elevation: ElevationStats;
@@ -23,11 +23,8 @@ const profile = buildProfile(elevation.profile);
 // Compact payload for the hover script: [x, y, distance in metres, elevation in metres].
 const samples = profile ? profile.points.map((p) => [p.x, p.y, Math.round(p.d), Math.round(p.ele)]) : [];
 
-const ariaLabel = profile
-  ? `Profilo altimetrico: ${formatKm(lengthM)}, quota da ${formatMetres(profile.minEle)} a ${formatMetres(
-      profile.maxEle,
-    )}, dislivello in salita ${formatMetres(elevation.ascent_m)}.`
-  : '';
+// Taken from the statistics, not from `profile`: see profileLabels.
+const labels = profileLabels(elevation, lengthM);
 ---
 
 {
@@ -37,7 +34,7 @@ const ariaLabel = profile
         class="profile__svg"
         viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
         role="img"
-        aria-label={ariaLabel}
+        aria-label={labels.ariaLabel}
       >
         <line
           class="profile__axis"
@@ -58,10 +55,10 @@ const ariaLabel = profile
         <path class="profile__line" d={profile.line} />
 
         <text class="profile__label" x={profile.plot.left - 8} y={profile.plot.top + 4} text-anchor="end">
-          {Math.round(profile.maxEle)} m
+          {labels.maxEle}
         </text>
         <text class="profile__label" x={profile.plot.left - 8} y={profile.plot.bottom + 4} text-anchor="end">
-          {Math.round(profile.minEle)} m
+          {labels.minEle}
         </text>
         <text class="profile__label" x={profile.plot.left} y={VIEWBOX_HEIGHT - 6}>
           0 km

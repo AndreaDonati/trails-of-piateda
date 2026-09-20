@@ -3,10 +3,11 @@ import {
   buildProfile,
   MAX_POINTS,
   PADDING,
+  profileLabels,
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
 } from '../src/components/elevationProfile';
-import type { ProfileSample } from '../src/lib/gpx';
+import type { ElevationStats, ProfileSample } from '../src/lib/gpx';
 
 /** A ramp from 500 m to 500 + count-1 m, one sample every 25 m as gpx.ts produces. */
 function ramp(count: number, step = 25): ProfileSample[] {
@@ -86,5 +87,33 @@ describe('buildProfile', () => {
         { d: 0, ele: 510 },
       ]),
     ).toBeNull();
+  });
+});
+
+describe('profileLabels', () => {
+  /** min/max deliberately outside the range of the resampled profile, as a summit between
+   *  two resample points produces. */
+  const elevation: ElevationStats = {
+    ascent_m: 940,
+    descent_m: 120,
+    min_m: 498,
+    max_m: 1502,
+    profile: ramp(50),
+  };
+
+  it('labels the axis with the statistics and not with the drawn samples', () => {
+    const geometry = buildProfile(elevation.profile) as NonNullable<ReturnType<typeof buildProfile>>;
+    expect([geometry.minEle, geometry.maxEle]).toEqual([500, 549]);
+
+    const labels = profileLabels(elevation, 8200);
+    expect(labels.minEle).toBe('498 m');
+    expect(labels.maxEle).toBe('1502 m');
+  });
+
+  it('describes the figure with the same numbers the statistics bar shows', () => {
+    const labels = profileLabels(elevation, 8200);
+    expect(labels.ariaLabel).toBe(
+      'Profilo altimetrico: 8,2 km, quota da 498 m a 1502 m, dislivello in salita 940 m.',
+    );
   });
 });

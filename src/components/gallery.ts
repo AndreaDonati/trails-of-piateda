@@ -54,8 +54,12 @@ export interface PhotoMarker {
 export const PHOTO_SELECT_EVENT = 'photo:select';
 
 export interface PhotoSelectDetail {
-  /** `DerivedPhoto.id`, unique within the entry. */
-  id: string;
+  /**
+   * `DerivedPhoto.id`, unique within the entry, or `null` to mean "nothing is selected any
+   * more". The gallery sends the null form when the lightbox closes, so the map can drop the
+   * marker highlight instead of leaving one lit with no lightbox open.
+   */
+  id: string | null;
   /**
    * Who selected the photo. Each side ignores the events it dispatched itself, which is what
    * keeps gallery → map → gallery from looping: both listen on `document`, so without this

@@ -117,7 +117,9 @@ const HEADING_ID = 'titolo-foto';
     };
 
     const open = (index: number, from: HTMLElement | null) => {
-      opener = from;
+      // Keep the first opener when the lightbox is already open: a marker click that arrives
+      // while it is open passes null, and overwriting would lose the element to focus on close.
+      if (from || !dialog.open) opener = from;
       show(index);
       if (!dialog.open) dialog.showModal();
     };
@@ -161,6 +163,8 @@ const HEADING_ID = 'titolo-foto';
       // for modal dialogs; the browser's own restoration does not survive the map case.
       opener?.focus();
       opener = null;
+      // Tell the map that nothing is selected any more, so the marker highlight clears.
+      document.dispatchEvent(photoSelectEvent({ id: null, source: 'gallery' }));
       // Stop the (possibly large) display image from staying in memory for the whole visit.
       image.removeAttribute('src');
     });
@@ -168,8 +172,12 @@ const HEADING_ID = 'titolo-foto';
     document.addEventListener(PHOTO_SELECT_EVENT, (event) => {
       // Our own selections already opened the lightbox; reacting to them would re-enter show().
       if (event.detail.source === 'gallery') return;
-      const index = links.findIndex((link) => link.dataset.photoId === event.detail.id);
-      if (index >= 0) open(index, null);
+      const { id } = event.detail;
+      if (id === null) return;
+      const index = links.findIndex((link) => link.dataset.photoId === id);
+      // The map focuses the marker before dispatching, so it is the element to return to.
+      const marker = document.activeElement;
+      if (index >= 0) open(index, marker instanceof HTMLElement ? marker : null);
     });
   }
 </script>

@@ -13,8 +13,7 @@
  * `content/trails/piateda-ambria/track.gpx`) so a failed build names the entry.
  */
 import { readFileSync, statSync } from 'node:fs';
-import { DOMParser } from '@xmldom/xmldom';
-import { gpx as gpxToGeoJson } from '@tmcw/togeojson';
+import { DOMParser, type Document, type Element } from '@xmldom/xmldom';
 import { simplify } from '@turf/simplify';
 import type { Feature, FeatureCollection, LineString, Point, Position } from 'geojson';
 import { describeArea, isInsideArea } from './area';
@@ -92,10 +91,50 @@ const EARTH_RADIUS_M = 6371008.8;
 const METERS_PER_DEGREE = (2 * Math.PI * EARTH_RADIUS_M) / 360;
 
 export class GpxError extends Error {
-  constructor(label: string, detail: string) {
-    super(`${label}: ${detail}`);
+  constructor(label: string, detail: string, options?: ErrorOptions) {
+    super(`${label}: ${detail}`, options);
     this.name = 'GpxError';
   }
+}
+
+/**
+ * Descendants of `parent` whose *local* name is `name`, in document order.
+ *
+ * Binding the GPX namespace to a prefix (`<gpx:gpx xmlns:gpx="…/GPX/1/1"><gpx:trk>`) is as valid
+ * as the usual default-namespace form, but a lookup by qualified name (`getElementsByTagName`)
+ * misses it and the file would be rejected as having no track. The namespace is left as a
+ * wildcard rather than pinned to `http://www.topografix.com/GPX/1/1` because files that declare
+ * no namespace at all are common in the wild and were accepted before; the root element and the
+ * `version` attribute are what decide whether the document is GPX 1.1.
+ *
+ * This is also why the track and waypoint extraction below reads the DOM directly instead of
+ * going through `@tmcw/togeojson`: that library matches qualified names throughout, so on a
+ * prefixed document it returns no features.
+ */
+function byLocalName(parent: Document | Element, name: string): Element[] {
+  return Array.from(parent.getElementsByTagNameNS('*', name));
+}
+
+/** Numeric value of an attribute, or null when absent or not a finite number. */
+function numberAttribute(el: Element, name: string): number | null {
+  const raw = el.getAttribute(name);
+  if (raw === null) return null;
+  const n = Number(raw.trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Position of a `<trkpt>` or `<wpt>`: [lon, lat], with the elevation appended when the element
+ * carries a numeric `<ele>`. Null when lat/lon are missing or not numbers, which is how a
+ * malformed point is dropped from the track.
+ */
+function position(el: Element): Position | null {
+  const lon = numberAttribute(el, 'lon');
+  const lat = numberAttribute(el, 'lat');
+  if (lon === null || lat === null) return null;
+  const raw = byLocalName(el, 'ele')[0]?.textContent?.trim();
+  const ele = raw === undefined || raw === '' ? Number.NaN : Number(raw);
+  return Number.isFinite(ele) ? [lon, lat, ele] : [lon, lat];
 }
 
 export function parseGpx(xml: string, label: string): ParsedGpx {
@@ -126,33 +165,26 @@ export function parseGpx(xml: string, label: string): ParsedGpx {
   if (version !== '1.1') {
     throw new GpxError(label, `GPX version 1.1 is required, found version="${version ?? ''}"`);
   }
-  if (doc.getElementsByTagName('trk').length === 0) {
-    const hint = doc.getElementsByTagName('rte').length > 0 ? ' (the file only has <rte> routes)' : '';
+  const tracks = byLocalName(doc, 'trk');
+  if (tracks.length === 0) {
+    const hint = byLocalName(doc, 'rte').length > 0 ? ' (the file only has <rte> routes)' : '';
     throw new GpxError(label, `at least one <trk> track is required${hint}`);
   }
-  // Counted in the DOM: togeojson silently drops a track with a single point, so the
-  // GeoJSON would report 0 points for a file that has 1.
-  const trkptCount = doc.getElementsByTagName('trkpt').length;
+  // Counted before the points are read so that a file with one point is reported as having one,
+  // not as having none: a point whose lat/lon are unusable is a different error, below.
+  const trkptCount = byLocalName(doc, 'trkpt').length;
   if (trkptCount < 2) {
     throw new GpxError(label, `at least two track points are required, found ${trkptCount}`);
   }
 
-  const features = gpxToGeoJson(doc).features;
+  // Segments and multiple tracks are concatenated in file order: a recording with GPS
+  // pauses is still one hike, and the gap between segments is real walked distance.
   const points: TrackPoint[] = [];
-  for (const f of features) {
-    if (f.properties?._gpxType !== 'trk') continue;
-    // Segments and multiple tracks are concatenated in file order: a recording with GPS
-    // pauses is still one hike, and the gap between segments is real walked distance.
-    const lines: Position[][] =
-      f.geometry.type === 'LineString'
-        ? [f.geometry.coordinates]
-        : f.geometry.type === 'MultiLineString'
-          ? f.geometry.coordinates
-          : [];
-    for (const line of lines) {
-      for (const c of line) {
-        points.push({ lon: c[0] as number, lat: c[1] as number, ele: c.length > 2 ? (c[2] as number) : null });
-      }
+  for (const trk of tracks) {
+    for (const trkpt of byLocalName(trk, 'trkpt')) {
+      const c = position(trkpt);
+      if (c === null) continue;
+      points.push({ lon: c[0] as number, lat: c[1] as number, ele: c.length > 2 ? (c[2] as number) : null });
     }
   }
   if (points.length < 2) {
@@ -169,13 +201,14 @@ export function parseGpx(xml: string, label: string): ParsedGpx {
   });
 
   const waypoints: Feature<Point, WaypointProperties>[] = [];
-  for (const f of features) {
-    if (f.geometry.type !== 'Point') continue;
-    const name = f.properties?.name;
+  for (const wpt of byLocalName(doc, 'wpt')) {
+    const c = position(wpt);
+    if (c === null) continue;
+    const name = byLocalName(wpt, 'name')[0]?.textContent?.trim();
     waypoints.push({
       type: 'Feature',
-      geometry: f.geometry,
-      properties: { name: typeof name === 'string' && name.length > 0 ? name : null },
+      geometry: { type: 'Point', coordinates: c },
+      properties: { name: name !== undefined && name.length > 0 ? name : null },
     });
   }
 
@@ -231,11 +264,21 @@ export function computeStats(points: TrackPoint[], label: string): TrackStats {
     return { length_m, bbox, elevation: null };
   }
 
+  // Ascent, descent and the extremes in one pass. `Math.min(...smoothed)` would pass every
+  // point as a separate argument and throw RangeError somewhere above 100 000 of them, which a
+  // multi-day recording at 1 Hz reaches; nothing here may scale with the point count other than
+  // by iterating over it.
   const smoothed = smooth(points.map((p) => p.ele as number));
   let ascent_m = 0;
   let descent_m = 0;
-  for (let i = 1; i < smoothed.length; i++) {
-    const delta = (smoothed[i] as number) - (smoothed[i - 1] as number);
+  let min_m = Infinity;
+  let max_m = -Infinity;
+  for (let i = 0; i < smoothed.length; i++) {
+    const ele = smoothed[i] as number;
+    if (ele < min_m) min_m = ele;
+    if (ele > max_m) max_m = ele;
+    if (i === 0) continue;
+    const delta = ele - (smoothed[i - 1] as number);
     if (delta > 0) ascent_m += delta;
     else descent_m -= delta;
   }
@@ -243,13 +286,7 @@ export function computeStats(points: TrackPoint[], label: string): TrackStats {
   return {
     length_m,
     bbox,
-    elevation: {
-      ascent_m,
-      descent_m,
-      min_m: Math.min(...smoothed),
-      max_m: Math.max(...smoothed),
-      profile: resampleProfile(cumulative, smoothed),
-    },
+    elevation: { ascent_m, descent_m, min_m, max_m, profile: resampleProfile(cumulative, smoothed) },
   };
 }
 
@@ -325,18 +362,38 @@ export function loadTrack(gpxPath: string, label: string = gpxPath): Track {
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const parsed = parseGpx(readFileSync(gpxPath, 'utf8'), label);
-  const stats = computeStats(parsed.points, label);
-  const withEle = stats.elevation !== null;
-  const track: Track = {
-    ...parsed,
-    stats,
-    line: {
-      type: 'LineString',
-      coordinates: parsed.points.map((p) => (withEle ? [p.lon, p.lat, p.ele as number] : [p.lon, p.lat])),
-    },
-    simplified: simplifyLine(parsed.points),
-  };
+  const track = describeFailures(label, () => {
+    const parsed = parseGpx(readFileSync(gpxPath, 'utf8'), label);
+    const stats = computeStats(parsed.points, label);
+    const withEle = stats.elevation !== null;
+    return {
+      ...parsed,
+      stats,
+      line: {
+        type: 'LineString',
+        coordinates: parsed.points.map((p) => (withEle ? [p.lon, p.lat, p.ele as number] : [p.lon, p.lat])),
+      },
+      simplified: simplifyLine(parsed.points),
+    } satisfies Track;
+  });
   cache.set(key, track);
   return track;
+}
+
+/**
+ * Run `work`, making sure whatever escapes it names the entry (design D3: a failed build must
+ * tell the contributor which file to look at). Validation already throws GpxError and passes
+ * through unchanged; this catches the rest — a bug here, a memory limit, a dependency throwing
+ * on an input we did not anticipate — which would otherwise reach the build log as a bare
+ * message such as "Maximum call stack size exceeded". The original error is kept as `cause`,
+ * so its stack is still printed.
+ */
+function describeFailures<T>(label: string, work: () => T): T {
+  try {
+    return work();
+  } catch (err) {
+    if (err instanceof GpxError) throw err;
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    throw new GpxError(label, `could not be processed (${detail})`, { cause: err });
+  }
 }

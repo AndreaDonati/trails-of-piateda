@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Same track as known.gpx (first segment only), with the GPX 1.1 namespace bound to a
+     prefix instead of being the default namespace. Both forms are valid GPX 1.1. -->
+<gpx:gpx xmlns:gpx="http://www.topografix.com/GPX/1/1" version="1.1" creator="fixture">
+  <gpx:wpt lat="46.160" lon="9.930"><gpx:name>Partenza</gpx:name></gpx:wpt>
+  <gpx:trk>
+    <gpx:name>Prefixed</gpx:name>
+    <gpx:trkseg>
+      <gpx:trkpt lat="46.160" lon="9.930"><gpx:ele>100</gpx:ele></gpx:trkpt>
+      <gpx:trkpt lat="46.161" lon="9.930"><gpx:ele>110</gpx:ele></gpx:trkpt>
+      <gpx:trkpt lat="46.162" lon="9.930"><gpx:ele>120</gpx:ele></gpx:trkpt>
+      <gpx:trkpt lat="46.163" lon="9.930"><gpx:ele>130</gpx:ele></gpx:trkpt>
+      <gpx:trkpt lat="46.164" lon="9.930"><gpx:ele>140</gpx:ele></gpx:trkpt>
+      <gpx:trkpt lat="46.165" lon="9.930"><gpx:ele>150</gpx:ele></gpx:trkpt>
+    </gpx:trkseg>
+  </gpx:trk>
+</gpx:gpx>

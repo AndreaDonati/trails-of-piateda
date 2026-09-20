@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyFilters,
+  DIFFICULTIES,
   EMPTY_FILTERS,
   filtersToSearch,
   isEmpty,
+  KINDS,
   matches,
   municipalityOptions,
   parseFilters,
+  sameMunicipality,
   type EntryListItem,
   type FilterState,
 } from '../src/components/filters';
+import { DIFFICULTIES as SCHEMA_DIFFICULTIES } from '../src/content.config';
 
 function entry(overrides: Partial<EntryListItem> = {}): EntryListItem {
   return {
@@ -110,5 +114,39 @@ describe('municipalityOptions', () => {
       entry({ id: 'b', municipalities: ['piateda', 'Albosaggia'] }),
     ];
     expect(municipalityOptions(list)).toEqual(['Albosaggia', 'Caiolo', 'Piateda']);
+  });
+});
+
+describe('sameMunicipality', () => {
+  // The chips use this to decide their pressed state; before, they compared the raw strings
+  // and `?municipality=piateda` filtered the list while no chip looked selected.
+  it('compares the way the filter predicate does', () => {
+    expect(sameMunicipality('piateda', 'Piateda')).toBe(true);
+    expect(sameMunicipality(' Montagna in Valtellina ', 'montagna in valtellina')).toBe(true);
+    expect(sameMunicipality('', 'Piateda')).toBe(false);
+    expect(sameMunicipality('Caiolo', 'Piateda')).toBe(false);
+  });
+
+  it('agrees with matches on a lowercased query value', () => {
+    const e = entry({ municipalities: ['Piateda'] });
+    expect(matches(e, filters({ municipality: 'piateda' }))).toBe(true);
+    expect(sameMunicipality('piateda', municipalityOptions([e])[0] as string)).toBe(true);
+  });
+});
+
+describe('the enumerations the controls offer', () => {
+  // filters.ts keeps its own copy because src/content.config.ts cannot be imported into the
+  // client bundle (astro:content, astro/loaders, node:fs, catalog check at import time).
+  // This test is what stops a fifth difficulty being added in one place only.
+  it('lists exactly the difficulties of the content schema', () => {
+    expect([...DIFFICULTIES]).toEqual([...SCHEMA_DIFFICULTIES]);
+  });
+
+  it('lists both kinds and the query string accepts each of them', () => {
+    expect([...KINDS]).toEqual(['trail', 'route']);
+    for (const kind of KINDS) expect(parseFilters(`?kind=${kind}`).kind).toBe(kind);
+    for (const difficulty of DIFFICULTIES) {
+      expect(parseFilters(`?difficulty=${difficulty}`).difficulty).toBe(difficulty);
+    }
   });
 });

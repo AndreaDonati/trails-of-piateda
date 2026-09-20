@@ -27,17 +27,46 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] as string);
 }
 
-/** `&` is already escaped to `&amp;` at this point, so query strings still match. */
-const SAFE_HREF = /^(https?:\/\/|mailto:|\/)[^\s]*$/;
+/**
+ * Accepted link targets. `&` is already escaped to `&amp;` here, so query strings still match.
+ *
+ * A leading `//` (and `/\`, which browsers normalise to `//`) is rejected: the browser reads
+ * both as protocol-relative, so `[clicca qui](//evil.example)` would become an off-site anchor
+ * while the reviewer of the pull request reads the target as a site-relative path.
+ */
+const SAFE_HREF = /^(?:https?:\/\/|mailto:|\/(?![/\\]))[^\s]*$/;
 
-function inlineMarkup(escaped: string): string {
+/** One `[label](href)`, captured so a run of text can be split around it. */
+const LINK = /(\[[^\]]+\]\([^)\s]+\))/;
+const LINK_PARTS = /^\[([^\]]+)\]\(([^)\s]+)\)$/;
+
+function emphasis(escaped: string): string {
   return escaped
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (whole, label: string, href: string) =>
-      SAFE_HREF.test(href) ? `<a href="${href}" rel="noopener">${label}</a>` : whole,
-    )
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
     .replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:!?)]|$)/g, '$1<em>$2</em>');
+}
+
+/**
+ * Links are split out of the run before emphasis is applied, the same way code spans are in
+ * `inline`, because the emphasis rules must never see generated markup: run over a finished
+ * anchor they rewrote the href itself, turning `[x](/a*b*c)` into `href="/a<em>b</em>c"`, and
+ * `_` in a URL broke the same way. The label is still emphasised, so `[**x**](/a)` works; as
+ * with code spans, an emphasis run that opens before a link and closes after it is left as
+ * written rather than reaching across the boundary.
+ */
+function inlineMarkup(escaped: string): string {
+  return escaped
+    .split(LINK)
+    .map((part, i) => {
+      if (i % 2 === 0) return emphasis(part);
+      const parts = LINK_PARTS.exec(part);
+      if (!parts) return emphasis(part);
+      const label = parts[1] as string;
+      const href = parts[2] as string;
+      return SAFE_HREF.test(href) ? `<a href="${href}" rel="noopener">${emphasis(label)}</a>` : emphasis(part);
+    })
+    .join('');
 }
 
 /** Code spans are extracted first so emphasis and links are not applied inside them. */

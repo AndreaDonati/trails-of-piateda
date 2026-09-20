@@ -42,6 +42,8 @@ jobs:
         env:
           SITE_URL: https://${{ github.repository_owner }}.github.io
           BASE_PATH: /${{ github.event.repository.name }}
+          # Footer and contribution links follow the fork, not the original repository.
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           # Optional report-form configuration (see docs/report-form.md).
           # Read from repository *variables*, not secrets: they hold no
           # sensitive data (public Google Form URL and public entry ids),

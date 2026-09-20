@@ -194,6 +194,13 @@
   font-weight: var(--font-weight-bold);
 }
 
+/* Photo count of the selected entry: secondary to the statistics above it. */
+.track-map__photos {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
 .track-map__cta {
   display: inline-block;
   padding: var(--space-2) var(--space-4);

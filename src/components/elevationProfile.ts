@@ -3,9 +3,11 @@
  *
  * Kept apart from ElevationProfile.astro so the path generation is a pure function that
  * Vitest can check without a DOM: given the resampled profile of src/lib/gpx.ts it returns
- * the SVG coordinates, the two path strings and the numbers the axis labels show.
+ * the SVG coordinates and the two path strings. `profileLabels` builds the text of the axis
+ * labels, which comes from the statistics rather than from the drawn points.
  */
-import type { ProfileSample } from '../lib/gpx';
+import type { ElevationStats, ProfileSample } from '../lib/gpx';
+import { formatKm, formatMetres } from './format';
 
 /** User units of the SVG. The component gives the <svg> the same aspect ratio in CSS. */
 export const VIEWBOX_WIDTH = 1000;
@@ -100,4 +102,34 @@ export function buildProfile(
   const area = `${line} L${last.x} ${plot.bottom} L${first.x} ${plot.bottom} Z`;
 
   return { points, line, area, minEle, maxEle, totalM, plot };
+}
+
+export interface ProfileLabels {
+  /** Elevation printed at the bottom and at the top of the y axis, already formatted. */
+  minEle: string;
+  maxEle: string;
+  /** Summary read by a screen reader in place of the drawing. */
+  ariaLabel: string;
+}
+
+/**
+ * Axis labels and accessible description of the profile.
+ *
+ * The elevations come from ElevationStats, not from the geometry above: the profile is
+ * resampled every PROFILE_STEP_M and then thinned to MAX_POINTS, so a summit that falls
+ * between two samples is absent from the drawn curve. Taking the labels from the geometry
+ * made the same page show one "quota massima" on the profile and a different one in the
+ * statistics bar. The curve keeps its own extremes as the drawing scale; only what is
+ * written agrees with the statistics.
+ */
+export function profileLabels(elevation: ElevationStats, lengthM: number): ProfileLabels {
+  const min = formatMetres(elevation.min_m);
+  const max = formatMetres(elevation.max_m);
+  return {
+    minEle: min,
+    maxEle: max,
+    ariaLabel: `Profilo altimetrico: ${formatKm(lengthM)}, quota da ${min} a ${max}, dislivello in salita ${formatMetres(
+      elevation.ascent_m,
+    )}.`,
+  };
 }

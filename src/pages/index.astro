@@ -15,7 +15,7 @@ import { CLEAR_BUTTON_ID, COUNT_ID, EMPTY_STATE_ID, LIST_ID, type EntryListItem 
 import { coverPhoto, photoAlt, type CardCover } from '../components/gallery';
 import { formatResultCount } from '../components/format';
 import { getEntries, getPhotos, getTrack } from '../lib/catalog';
-import { SITE_NAME } from '../lib/site';
+import { SITE_NAME, withBase } from '../lib/site';
 
 /**
  * The cover is kept next to the item instead of inside it: `EntryListItem` is serialised into
@@ -76,6 +76,17 @@ const description =
       <div class="elenco__results">
         <p class="elenco__count" id={COUNT_ID} aria-live="polite">{formatResultCount(entries.length)}</p>
 
+        {
+          /* Distinct from the filter empty state below: an empty catalog is not a failed
+             search, and pointing at the contribution page is the useful answer. */
+          entries.length === 0 && (
+            <p class="elenco__empty-catalog">
+              Il catalogo è ancora vuoto. Se conosci un sentiero della zona, puoi{' '}
+              <a href={withBase('/contribuisci/')}>proporlo o aggiungerlo</a>.
+            </p>
+          )
+        }
+
         <ul class="elenco__list" id={LIST_ID}>
           {cards.map((card) => <EntryCard entry={card.item} cover={card.cover} />)}
         </ul>
@@ -124,6 +135,11 @@ const description =
     border: 1px dashed var(--color-border-strong);
     border-radius: var(--radius-md);
     text-align: center;
+  }
+
+  .elenco__empty-catalog {
+    color: var(--color-text-muted);
+    margin-block: var(--space-4);
   }
 
   .elenco__empty button {

@@ -102,6 +102,7 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
             fit="data"
             height="100%"
             photos={toPhotoMarkers(photos)}
+            reportPicking={report !== null}
           />
           <button class="entry__fullscreen" type="button" hidden>Schermo intero</button>
         </div>
