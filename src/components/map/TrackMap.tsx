@@ -42,6 +42,8 @@ import {
   SOURCE_IDS,
   type Difficulty,
 } from '../../lib/mapConfig';
+import { PHOTO_SELECT_EVENT, photoSelectEvent, type PhotoMarker, type PhotoSelectDetail } from '../gallery';
+import type { ReportPickDetail, ReportPointDetail } from '../../lib/reportForm';
 import { isWebGLAvailable } from './webgl';
 import { difficultyLabel, formatAscentM, formatLengthKm, isDifficulty, kindLabel } from './format';
 import {
@@ -67,6 +69,11 @@ export interface TrackMapProps {
   height?: string;
   /** Show the collapsible legend. Default: overview only. */
   legend?: boolean;
+  /**
+   * Photos of the entry, in track order. Drawn as camera markers in `detail` mode only; the
+   * overview map is never given any (design D10), and passing them there would draw nothing.
+   */
+  photos?: readonly PhotoMarker[];
 }
 
 /** Payload of the `map:ready` event dispatched on `document` once layers are added. */
@@ -285,6 +292,131 @@ function addDetailMarkers(map: MapLibreMap, data: FeatureCollection, sink: Marke
   }
 }
 
+// --- Photo markers (detail mode, task 6.5) -----------------------------------------------
+
+function createPhotoMarkerElement(photo: PhotoMarker, index: number): HTMLButtonElement {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'track-marker track-marker--photo';
+  el.dataset.photoId = photo.id;
+  // The caption is the only description of the photo the visitor has before opening it.
+  el.setAttribute('aria-label', photo.caption ? `Foto: ${photo.caption}` : `Foto ${index + 1}`);
+
+  const thumb = document.createElement('img');
+  thumb.className = 'track-marker__thumb';
+  thumb.src = photo.thumb;
+  thumb.alt = '';
+  thumb.loading = 'lazy';
+
+  // Camera badge (CSS only) so the marker reads as a photo and not as a waypoint.
+  const camera = document.createElement('span');
+  camera.className = 'track-marker__camera';
+  camera.setAttribute('aria-hidden', 'true');
+
+  el.append(thumb, camera);
+  return el;
+}
+
+/**
+ * One marker per photo, plus the two halves of the `photo:select` contract (design D10):
+ * a click dispatches the event so the gallery opens its lightbox, and an event from the
+ * gallery highlights the matching marker. Returns the listener teardown.
+ */
+function addPhotoMarkers(map: MapLibreMap, photos: readonly PhotoMarker[], sink: Marker[]): () => void {
+  const elements = new Map<string, HTMLElement>();
+
+  const highlight = (id: string) => {
+    for (const [photoId, el] of elements) el.classList.toggle('track-marker--selected', photoId === id);
+  };
+
+  photos.forEach((photo, index) => {
+    const element = createPhotoMarkerElement(photo, index);
+    element.addEventListener('click', (event) => {
+      // Without this the map click handler would also run and clear the track selection.
+      event.stopPropagation();
+      highlight(photo.id);
+      document.dispatchEvent(photoSelectEvent({ id: photo.id, source: 'map' }));
+    });
+    elements.set(photo.id, element);
+    sink.push(new Marker({ element }).setLngLat([photo.lon, photo.lat]).addTo(map));
+  });
+
+  const onSelect = (event: CustomEvent<PhotoSelectDetail>) => {
+    // Our own click already highlighted the marker; reacting here would be the return leg of
+    // a gallery ↔ map loop.
+    if (event.detail.source === 'map') return;
+    const photo = photos.find((p) => p.id === event.detail.id);
+    if (!photo) return;
+    highlight(photo.id);
+    // Pan only when the marker is off screen, so selecting a visible photo does not move the map.
+    if (!map.getBounds().contains([photo.lon, photo.lat])) map.panTo([photo.lon, photo.lat]);
+  };
+  document.addEventListener(PHOTO_SELECT_EVENT, onSelect);
+  return () => document.removeEventListener(PHOTO_SELECT_EVENT, onSelect);
+}
+
+// --- Report picking (task 7.3) ----------------------------------------------------------
+
+/**
+ * Point picking for the problem-report panel. The panel switches the mode with `report:pick`
+ * and this island answers every click with `report:point`; the two events travel in opposite
+ * directions and neither side listens to the one it sends, so they cannot feed each other.
+ *
+ * A single marker is kept and moved, never duplicated, and it is removed when picking is
+ * switched off (a cancel) so the panel and the map never disagree on what is being reported.
+ * `e.lngLat` is the ground position under the cursor, which MapLibre resolves against the
+ * terrain mesh when terrain is on, so picking works in 2D and in 3D alike.
+ */
+function attachReportPicking(map: MapLibreMap): () => void {
+  let active = false;
+  let marker: Marker | null = null;
+
+  const element = () => {
+    const el = document.createElement('div');
+    el.className = 'track-marker track-marker--report';
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', 'Punto della segnalazione');
+    return el;
+  };
+
+  // Same four decimals the panel displays and sends (COORDINATE_DECIMALS in lib/reportForm).
+  const round = (value: number) => Math.round(value * 1e4) / 1e4;
+
+  const onClick = (e: { lngLat: { lat: number; lng: number } }) => {
+    if (!active) return;
+    const lat = round(e.lngLat.lat);
+    const lon = round(e.lngLat.lng);
+    if (marker) marker.setLngLat([lon, lat]);
+    else marker = new Marker({ element: element() }).setLngLat([lon, lat]).addTo(map);
+    document.dispatchEvent(new CustomEvent<ReportPointDetail>('report:point', { detail: { lat, lon } }));
+  };
+
+  // Registered after the track interaction, so it has the last word on the cursor: the hover
+  // handler would otherwise leave a pointer cursor behind while picking.
+  const onMouseMove = () => {
+    if (active) map.getCanvas().style.cursor = 'crosshair';
+  };
+
+  const onPick = (e: CustomEvent<ReportPickDetail>) => {
+    active = e.detail.active;
+    map.getCanvas().style.cursor = active ? 'crosshair' : '';
+    if (!active) {
+      marker?.remove();
+      marker = null;
+    }
+  };
+
+  map.on('click', onClick);
+  map.on('mousemove', onMouseMove);
+  document.addEventListener('report:pick', onPick);
+
+  return () => {
+    document.removeEventListener('report:pick', onPick);
+    marker?.remove();
+    marker = null;
+  };
+}
+
 // --- Component --------------------------------------------------------------------------
 
 export default function TrackMap({
@@ -295,6 +427,7 @@ export default function TrackMap({
   fit,
   height = '60vh',
   legend,
+  photos = [],
 }: TrackMapProps) {
   const terrainEnabled = terrain ?? mode === 'overview';
   const showLegend = legend ?? mode === 'overview';
@@ -319,6 +452,8 @@ export default function TrackMap({
     let cancelled = false;
     let map: MapLibreMap | null = null;
     const markers: Marker[] = [];
+    let detachReportPicking: (() => void) | null = null;
+    let detachPhotos: (() => void) | null = null;
 
     const start = async () => {
       // Fetch before creating the map so the first tiles requested are the framed ones.
@@ -359,6 +494,9 @@ export default function TrackMap({
         addTrackLayers(created, data);
         attachTrackInteraction(created, mode === 'overview' ? setSelected : undefined);
         if (mode === 'detail') addDetailMarkers(created, data, markers);
+        if (mode === 'detail') detachReportPicking = attachReportPicking(created);
+        // Photo markers are a detail-page feature; the overview is given no photo data at all.
+        if (mode === 'detail' && photos.length > 0) detachPhotos = addPhotoMarkers(created, photos, markers);
         setStatus('ready');
         document.dispatchEvent(
           new CustomEvent<TrackMapReadyDetail>('map:ready', {
@@ -371,11 +509,13 @@ export default function TrackMap({
 
     return () => {
       cancelled = true;
+      detachReportPicking?.();
+      detachPhotos?.();
       markers.forEach((m) => m.remove());
       map?.remove();
       mapRef.current = null;
     };
-  }, [dataUrl, mode, terrainEnabled, exaggeration, fit]);
+  }, [dataUrl, mode, terrainEnabled, exaggeration, fit, photos]);
 
   // The side panel takes width from the map on desktop; MapLibre only watches window resizes.
   useEffect(() => {

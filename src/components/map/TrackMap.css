@@ -274,3 +274,61 @@
   font-family: var(--font-family-sans);
   font-size: var(--font-size-xs);
 }
+
+/* Report point marker (task 7.3): a single marker the visitor moves with a click, in the
+   warning colour so it reads as "problem here" rather than as part of the track. */
+.track-marker--report {
+  width: 18px;
+  height: 18px;
+  background: var(--color-status-warning);
+  border-color: var(--color-track-casing);
+}
+
+/* Photo markers (task 6.5): the thumbnail itself, so the visitor can tell the photos apart
+   before opening one, with a camera badge that separates them from the track markers. */
+.track-marker--photo {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-width: 2px;
+  background: var(--color-surface-muted);
+  cursor: pointer;
+}
+
+.track-marker__thumb {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.track-marker__camera {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 16px;
+  height: 12px;
+  border: 2px solid var(--color-track-casing);
+  border-radius: 3px;
+  background: var(--color-text);
+}
+
+/* Lens. */
+.track-marker__camera::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 5px;
+  height: 5px;
+  margin: auto;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+}
+
+/* Selected from the gallery (the `photo:select` event) or clicked here. */
+.track-marker--selected {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 1px;
+  z-index: var(--z-panel);
+}

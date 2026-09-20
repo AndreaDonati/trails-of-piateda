@@ -11,9 +11,14 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import TrackMap from './map/TrackMap';
 import ElevationProfile from './ElevationProfile.astro';
+import PhotoGallery from './PhotoGallery.astro';
 import StatsBar from './StatsBar.astro';
-import { getTrack, KIND_PATH, type CatalogEntry } from '../lib/catalog';
+import ReportAction from './report/ReportAction.astro';
+import ReportPanel from './report/ReportPanel.astro';
+import { toGalleryPhoto, toPhotoMarkers } from './gallery';
+import { getPhotos, getTrack, KIND_PATH, type CatalogEntry } from '../lib/catalog';
 import { SITE_NAME, withBase } from '../lib/site';
+import { readReportFormConfig, REPORT_PANEL_ID } from '../lib/reportForm';
 import { renderMarkdown } from './markdown';
 import { difficultyLabel, formatDate, kindDemonstrative, kindLabel } from './format';
 
@@ -28,9 +33,29 @@ const { data, kind, slug } = entry;
 
 const track = getTrack(entry);
 const description = renderMarkdown(data.description);
+// Photos in track order, stripped of the source path: only derived URLs may reach the page
+// or the island props (design D10).
+const photos = (await getPhotos(entry)).map(toGalleryPhoto);
 const gpxUrl = withBase(`/gpx/${slug}.gpx`);
 // Base-aware: on GitHub Pages the endpoint lives under /trails-of-piateda/data/...
 const dataUrl = withBase(`/data/${KIND_PATH[kind]}/${slug}.geojson`);
+
+// Problem report (design D11): null unless the three PUBLIC_REPORT_FORM_* variables are set,
+// and then nothing about reporting is rendered. The form receives an absolute URL because the
+// owner opens it from a spreadsheet, where a site-relative path means nothing.
+const reportConfig = readReportFormConfig();
+const startPoint = track.points[0];
+const report =
+  reportConfig && startPoint
+    ? {
+        config: reportConfig,
+        target: {
+          name: data.name,
+          url: Astro.site ? new URL(entry.url, Astro.site).href : entry.url,
+          start: { lat: startPoint.lat, lon: startPoint.lon },
+        },
+      }
+    : null;
 
 const statusNotice =
   data.status === 'closed'
@@ -55,7 +80,7 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
 
       <div class="entry__actions">
         <a class="entry__download" href={gpxUrl} download={`${slug}.gpx`}>Scarica il GPX</a>
-        <!-- report action insertion point: the reporting wave adds the "Segnala un problema" button here -->
+        {report && <ReportAction panelId={REPORT_PANEL_ID} />}
       </div>
     </header>
 
@@ -70,7 +95,14 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
     <div class="entry__layout">
       <div class="entry__map-column">
         <div class="entry__map" id="mappa-scheda">
-          <TrackMap client:only="react" dataUrl={dataUrl} mode="detail" fit="data" height="100%" />
+          <TrackMap
+            client:only="react"
+            dataUrl={dataUrl}
+            mode="detail"
+            fit="data"
+            height="100%"
+            photos={toPhotoMarkers(photos)}
+          />
           <button class="entry__fullscreen" type="button" hidden>Schermo intero</button>
         </div>
       </div>
@@ -99,7 +131,7 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
           )
         }
 
-        <!-- gallery insertion point: the photo wave adds the thumbnails and the lightbox here -->
+        <PhotoGallery photos={photos} entryName={data.name} />
 
         {
           relatedTrails.length > 0 && (
@@ -184,7 +216,7 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
           </dl>
         </section>
 
-        <!-- report panel insertion point: the reporting wave adds the panel and the map picking here -->
+        {report && <ReportPanel id={REPORT_PANEL_ID} config={report.config} target={report.target} />}
       </div>
     </div>
   </article>

@@ -1,0 +1,214 @@
+---
+/**
+ * Problem-report panel on the detail page (task 7.2, design D11).
+ *
+ * Rendered only when the three PUBLIC_REPORT_FORM_* variables are set, so a build without
+ * them carries no markup, no script and no string about reporting.
+ *
+ * It is a <details> rather than a scripted drawer so the link to the form is reachable with
+ * JavaScript off: the URL is already built here, with the track start as position. The script
+ * adds only what needs a map — picking the point of the problem — and rewrites the link.
+ */
+import { buildReportUrl, formatPoint, type ReportFormConfig, type ReportTarget } from '../../lib/reportForm';
+
+export interface Props {
+  id: string;
+  config: ReportFormConfig;
+  target: ReportTarget;
+}
+
+const { id, config, target } = Astro.props;
+// config comes from readReportFormConfig, which already rejected an unparseable URL.
+const initialUrl = buildReportUrl(config, target) ?? config.url;
+---
+
+<details class="report" id={id} data-report-panel data-form-url={config.url} data-entry-field={config.entryField} data-position-field={config.positionField} data-entry-name={target.name} data-entry-url={target.url} data-start-lat={String(target.start.lat)} data-start-lon={String(target.start.lon)}>
+  <summary class="report__summary">Segnala un problema</summary>
+
+  <div class="report__body">
+    <p>
+      Puoi segnalare un ostacolo sul sentiero, una frana o un danno al tracciato, segnaletica
+      mancante o danneggiata, oppure un altro problema. Tipo di problema, descrizione, foto e
+      contatto si compilano nel modulo, non su questa pagina.
+    </p>
+    <p>
+      Il modulo chiede di accedere con un account Google: serve perché alla segnalazione si
+      possono allegare foto.
+    </p>
+    <p>
+      La segnalazione arriva al proprietario del sito, che la inoltra ai volontari che si
+      occupano della manutenzione dei sentieri. Il sito non conserva e non pubblica le
+      segnalazioni.
+    </p>
+
+    <!-- One source line: the HTML compressor drops the newline between the two elements,
+         and without it the coordinates and the hint would run together. -->
+    <p class="report__position">Posizione segnalata: <strong data-report-coords>{formatPoint(target.start)}</strong> <span class="report__hint" data-report-hint data-hint-picked="punto scelto sulla mappa">primo punto della traccia</span></p>
+
+    <div class="report__actions">
+      <button
+        class="report__pick"
+        type="button"
+        hidden
+        data-report-pick
+        data-label-cancel="Annulla la scelta del punto"
+        aria-pressed="false">Scegli il punto sulla mappa</button
+      >
+      <a class="report__open" href={initialUrl} target="_blank" rel="noopener" data-report-link>
+        Apri il modulo di segnalazione
+      </a>
+    </div>
+    <p class="report__hint">Il modulo si apre in una nuova scheda.</p>
+  </div>
+</details>
+
+<script>
+  import { buildReportUrl, formatPoint, type ReportFormConfig, type ReportPoint } from '../../lib/reportForm';
+
+  const panel = document.querySelector<HTMLDetailsElement>('[data-report-panel]');
+  if (panel) {
+    const data = panel.dataset;
+    const config: ReportFormConfig = {
+      url: data.formUrl ?? '',
+      entryField: data.entryField ?? '',
+      positionField: data.positionField ?? '',
+    };
+    const target = {
+      name: data.entryName ?? '',
+      url: data.entryUrl ?? '',
+      start: { lat: Number(data.startLat), lon: Number(data.startLon) },
+    };
+
+    const opener = document.querySelector<HTMLButtonElement>('[data-report-open]');
+    const pick = panel.querySelector<HTMLButtonElement>('[data-report-pick]');
+    const coords = panel.querySelector<HTMLElement>('[data-report-coords]');
+    const hint = panel.querySelector<HTMLElement>('[data-report-hint]');
+    const link = panel.querySelector<HTMLAnchorElement>('[data-report-link]');
+    // Labels live in the markup so this script holds no user-visible text.
+    const labelPick = pick?.textContent ?? '';
+    const hintStart = hint?.textContent ?? '';
+
+    let picked: ReportPoint | null = null;
+    let picking = false;
+
+    const render = () => {
+      if (coords) coords.textContent = formatPoint(picked ?? target.start);
+      if (hint) hint.textContent = picked ? (hint.dataset.hintPicked ?? '') : hintStart;
+      const url = buildReportUrl(config, target, picked);
+      if (link && url) link.href = url;
+    };
+
+    const setPicking = (active: boolean) => {
+      picking = active;
+      // Leaving picking mode is a cancel: the island removes its marker, so the panel drops
+      // the coordinates with it instead of sending a point no longer shown on the map.
+      if (!active) picked = null;
+      if (pick) {
+        pick.textContent = active ? (pick.dataset.labelCancel ?? '') : labelPick;
+        pick.setAttribute('aria-pressed', String(active));
+      }
+      document.dispatchEvent(new CustomEvent('report:pick', { detail: { active } }));
+      render();
+    };
+
+    pick?.addEventListener('click', () => setPicking(!picking));
+
+    // The panel only sends report:pick and only listens to report:point, the island does the
+    // opposite: the two events cannot feed each other back.
+    document.addEventListener('report:point', (event) => {
+      picked = { lat: event.detail.lat, lon: event.detail.lon };
+      render();
+    });
+
+    // Picking needs the detail map. The control ships hidden and appears only once the island
+    // reports itself ready, so a browser without WebGL shows no control that cannot work.
+    document.addEventListener('map:ready', (event) => {
+      if (event.detail.mode === 'detail' && pick) pick.hidden = false;
+    });
+
+    opener?.addEventListener('click', () => {
+      panel.open = true;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    panel.addEventListener('toggle', () => {
+      opener?.setAttribute('aria-expanded', String(panel.open));
+      if (!panel.open && picking) setPicking(false);
+    });
+  }
+</script>
+
+<style>
+  .report {
+    margin-top: var(--space-6);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-alt);
+  }
+
+  .report__summary {
+    padding: var(--space-3) var(--space-4);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+  }
+
+  .report__body {
+    padding: 0 var(--space-4) var(--space-4);
+    max-width: 68ch;
+  }
+
+  .report__body p {
+    margin-block: 0 var(--space-3);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .report__position {
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text);
+  }
+
+  .report__position strong {
+    font-family: var(--font-family-mono);
+  }
+
+  .report__hint {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+  }
+
+  .report__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .report__pick {
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .report__pick[aria-pressed='true'] {
+    border-color: var(--color-primary-strong);
+    background: var(--color-primary-soft);
+  }
+
+  .report__open {
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-strong);
+    color: var(--color-on-primary);
+    font-weight: var(--font-weight-medium);
+    text-decoration: none;
+  }
+
+  .report__open:hover {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+</style>

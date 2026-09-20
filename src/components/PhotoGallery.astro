@@ -1,0 +1,300 @@
+---
+/**
+ * Photo gallery of a detail page (task 6.4, design D10/D12).
+ *
+ * The thumbnails are links to the display image, not buttons: with JavaScript off the gallery
+ * still works (the browser opens the full image), and the script below turns each link into the
+ * lightbox opener by preventing the default navigation. Middle-click and "open in new tab"
+ * therefore keep working too.
+ *
+ * The component renders nothing when the entry has no photos, so the page has no empty section
+ * and no heading; callers still guard, to keep the markup out of the page altogether.
+ */
+import { photoAlt, type GalleryPhoto } from './gallery';
+
+export interface Props {
+  /** Photos in track order, as `getPhotos` returns them. */
+  photos: readonly GalleryPhoto[];
+  /** Entry name, used to build the alt text of photos without a caption. */
+  entryName: string;
+}
+
+const { photos, entryName } = Astro.props;
+const HEADING_ID = 'titolo-foto';
+---
+
+{
+  photos.length > 0 && (
+    <section class="gallery" aria-labelledby={HEADING_ID} data-gallery>
+      <h2 id={HEADING_ID}>Foto</h2>
+
+      <ul class="gallery__list">
+        {photos.map((photo, index) => (
+          <li class="gallery__item">
+            <a
+              class="gallery__link"
+              href={photo.display.url}
+              data-photo-id={photo.id}
+              data-index={index}
+              data-width={photo.display.width}
+              data-height={photo.display.height}
+              data-caption={photo.caption ?? ''}
+              data-author={photo.author ?? ''}
+            >
+              <img
+                src={photo.thumb.url}
+                width={photo.thumb.width}
+                height={photo.thumb.height}
+                alt={photoAlt(photo.caption, entryName, index)}
+                decoding="async"
+                loading={index === 0 ? undefined : 'lazy'}
+              />
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      {/* Empty until the script fills it: the dialog is never shown without JavaScript. */}
+      <dialog class="lightbox" aria-label="Foto ingrandita">
+        <figure class="lightbox__frame">
+          <img class="lightbox__image" alt="" />
+          <figcaption class="lightbox__caption">
+            <p class="lightbox__text" />
+            <p class="lightbox__author" />
+            <p class="lightbox__counter" />
+          </figcaption>
+        </figure>
+        <button class="lightbox__button lightbox__button--close" type="button" data-close>
+          <span aria-hidden="true">×</span>
+          <span class="visually-hidden">Chiudi</span>
+        </button>
+        <button class="lightbox__button lightbox__button--prev" type="button" data-prev>
+          <span aria-hidden="true">‹</span>
+          <span class="visually-hidden">Foto precedente</span>
+        </button>
+        <button class="lightbox__button lightbox__button--next" type="button" data-next>
+          <span aria-hidden="true">›</span>
+          <span class="visually-hidden">Foto successiva</span>
+        </button>
+      </dialog>
+    </section>
+  )
+}
+
+<script>
+  import { PHOTO_SELECT_EVENT, photoSelectEvent } from './gallery';
+
+  const section = document.querySelector<HTMLElement>('[data-gallery]');
+  const dialog = section?.querySelector('dialog');
+  const image = dialog?.querySelector<HTMLImageElement>('.lightbox__image');
+  const text = dialog?.querySelector<HTMLParagraphElement>('.lightbox__text');
+  const author = dialog?.querySelector<HTMLParagraphElement>('.lightbox__author');
+  const counter = dialog?.querySelector<HTMLParagraphElement>('.lightbox__counter');
+  const links = [...(section?.querySelectorAll<HTMLAnchorElement>('.gallery__link') ?? [])];
+
+  if (section && dialog && image && text && author && counter && links.length > 0) {
+    // The element to give focus back to when the lightbox closes. Null when the lightbox was
+    // opened from the map: the marker lives in another component and may be off screen.
+    let opener: HTMLElement | null = null;
+    let current = 0;
+
+    const show = (index: number) => {
+      const link = links[((index % links.length) + links.length) % links.length];
+      if (!link) return;
+      current = Number(link.dataset.index ?? 0);
+      const caption = link.dataset.caption ?? '';
+      const credit = link.dataset.author ?? '';
+
+      image.src = link.href;
+      image.width = Number(link.dataset.width ?? 0);
+      image.height = Number(link.dataset.height ?? 0);
+      image.alt = link.querySelector('img')?.alt ?? '';
+      text.textContent = caption;
+      text.hidden = caption === '';
+      author.textContent = credit === '' ? '' : `Foto di ${credit}`;
+      author.hidden = credit === '';
+      counter.textContent = `${current + 1} di ${links.length}`;
+    };
+
+    const open = (index: number, from: HTMLElement | null) => {
+      opener = from;
+      show(index);
+      if (!dialog.open) dialog.showModal();
+    };
+
+    /** Move inside the lightbox; the map follows through the event. */
+    const step = (delta: number) => {
+      show(current + delta);
+      const id = links[current]?.dataset.photoId;
+      if (id) document.dispatchEvent(photoSelectEvent({ id, source: 'gallery' }));
+    };
+
+    links.forEach((link, index) => {
+      link.setAttribute('aria-haspopup', 'dialog');
+      link.addEventListener('click', (event) => {
+        // Let the browser handle the modified clicks that mean "open the image elsewhere".
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+        event.preventDefault();
+        open(index, link);
+        const id = link.dataset.photoId;
+        if (id) document.dispatchEvent(photoSelectEvent({ id, source: 'gallery' }));
+      });
+    });
+
+    dialog.querySelector('[data-close]')?.addEventListener('click', () => dialog.close());
+    dialog.querySelector('[data-prev]')?.addEventListener('click', () => step(-1));
+    dialog.querySelector('[data-next]')?.addEventListener('click', () => step(1));
+
+    // Escape is handled by the dialog itself; the arrows are the expected extra in a gallery.
+    dialog.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') step(-1);
+      else if (event.key === 'ArrowRight') step(1);
+    });
+
+    // Clicking the backdrop (the area of the dialog box outside the frame) closes it.
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+
+    dialog.addEventListener('close', () => {
+      // Focus goes back to the thumbnail that opened the lightbox, per the accessibility rule
+      // for modal dialogs; the browser's own restoration does not survive the map case.
+      opener?.focus();
+      opener = null;
+      // Stop the (possibly large) display image from staying in memory for the whole visit.
+      image.removeAttribute('src');
+    });
+
+    document.addEventListener(PHOTO_SELECT_EVENT, (event) => {
+      // Our own selections already opened the lightbox; reacting to them would re-enter show().
+      if (event.detail.source === 'gallery') return;
+      const index = links.findIndex((link) => link.dataset.photoId === event.detail.id);
+      if (index >= 0) open(index, null);
+    });
+  }
+</script>
+
+<style>
+  .gallery__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .gallery__link {
+    display: block;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .gallery__link img {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: var(--color-surface-muted);
+  }
+
+  .gallery__link:hover img {
+    opacity: 0.9;
+  }
+
+  /* Lightbox: the dialog box is the whole viewport, the photo sits in the middle of it, so a
+     click anywhere around the photo closes it. */
+  .lightbox {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    padding: var(--space-4);
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .lightbox::backdrop {
+    background: var(--color-backdrop);
+  }
+
+  .lightbox__frame {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    pointer-events: none;
+  }
+
+  .lightbox__image {
+    max-width: 100%;
+    /* Room for the caption under the photo. */
+    max-height: calc(100% - 6rem);
+    width: auto;
+    height: auto;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-muted);
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+  }
+
+  .lightbox__caption {
+    max-width: 60ch;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    text-align: center;
+    pointer-events: auto;
+  }
+
+  .lightbox__caption p {
+    margin: 0;
+  }
+
+  .lightbox__author,
+  .lightbox__counter {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-sm);
+  }
+
+  .lightbox__button {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: var(--font-size-2xl);
+    line-height: 1;
+    box-shadow: var(--shadow-md);
+  }
+
+  .lightbox__button:hover {
+    background: var(--color-surface-muted);
+  }
+
+  .lightbox__button--close {
+    top: var(--space-3);
+    right: var(--space-3);
+  }
+
+  .lightbox__button--prev {
+    top: 50%;
+    left: var(--space-3);
+    transform: translateY(-50%);
+  }
+
+  .lightbox__button--next {
+    top: 50%;
+    right: var(--space-3);
+    transform: translateY(-50%);
+  }
+</style>

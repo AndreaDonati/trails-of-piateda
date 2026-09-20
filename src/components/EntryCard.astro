@@ -5,19 +5,36 @@
  */
 import { cardElementId, type EntryListItem } from './filters';
 import { difficultyLabel, formatDuration, formatKm, formatMetres, kindLabel } from './format';
+import type { CardCover } from './gallery';
 
 export interface Props {
   entry: EntryListItem;
+  /** Omitted or null when the entry has no photos; the card then shows the placeholder block. */
+  cover?: CardCover | null;
 }
 
-const { entry } = Astro.props;
+const { entry, cover = null } = Astro.props;
 const duration = formatDuration(entry.duration_minutes);
 ---
 
 <li class="entry-list__item" id={cardElementId(entry.id)}>
   <article class="card">
-    <!-- cover insertion point: the photo wave replaces this placeholder with the cover thumbnail -->
-    <div class="card__cover" aria-hidden="true"></div>
+    {
+      cover ? (
+        <img
+          class="card__cover"
+          src={cover.url}
+          width={cover.width}
+          height={cover.height}
+          alt={cover.alt}
+          decoding="async"
+          loading={cover.eager ? undefined : 'lazy'}
+        />
+      ) : (
+        /* Neutral block rather than nothing: the cards keep the same shape down the list. */
+        <div class="card__cover" aria-hidden="true" />
+      )
+    }
 
     <div class="card__body">
       <p class="card__kind">{kindLabel(entry.kind)}</p>
@@ -69,10 +86,14 @@ const duration = formatDuration(entry.duration_minutes);
 
   .card__cover {
     flex: 0 0 auto;
+    /* Fixed box for both the thumbnail and the placeholder: `height: auto` overrides the
+       width/height attributes of the <img>, which are there only for the aspect ratio. */
     width: 5.5rem;
+    height: auto;
     aspect-ratio: 4 / 3;
     border-radius: var(--radius-sm);
     background: var(--color-surface-muted);
+    object-fit: cover;
   }
 
   .card__body {

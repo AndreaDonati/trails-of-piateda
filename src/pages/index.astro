@@ -12,28 +12,50 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import EntryCard from '../components/EntryCard.astro';
 import FilterPanel from '../components/FilterPanel';
 import { CLEAR_BUTTON_ID, COUNT_ID, EMPTY_STATE_ID, LIST_ID, type EntryListItem } from '../components/filters';
+import { coverPhoto, photoAlt, type CardCover } from '../components/gallery';
 import { formatResultCount } from '../components/format';
-import { getEntries, getTrack } from '../lib/catalog';
+import { getEntries, getPhotos, getTrack } from '../lib/catalog';
 import { SITE_NAME } from '../lib/site';
 
-const entries: EntryListItem[] = (await getEntries())
-  .filter((entry) => entry.data.status !== 'closed')
-  .map((entry) => {
-    const { stats } = getTrack(entry);
-    return {
-      id: entry.slug,
-      kind: entry.kind,
-      name: entry.data.name,
-      summary: entry.data.summary,
-      difficulty: entry.data.difficulty,
-      municipalities: entry.data.municipalities,
-      tags: entry.data.tags,
-      length_m: Math.round(stats.length_m),
-      ascent_m: stats.elevation ? Math.round(stats.elevation.ascent_m) : null,
-      duration_minutes: entry.data.duration_minutes ?? null,
-      url: entry.url,
-    };
-  });
+/**
+ * The cover is kept next to the item instead of inside it: `EntryListItem` is serialised into
+ * the filter island's props, and the island does not draw the cards (task 6.5).
+ */
+const cards: { item: EntryListItem; cover: CardCover | null }[] = await Promise.all(
+  (await getEntries())
+    .filter((entry) => entry.data.status !== 'closed')
+    .map(async (entry, index) => {
+      const { stats } = getTrack(entry);
+      const photos = await getPhotos(entry);
+      const cover = coverPhoto(photos);
+      return {
+        item: {
+          id: entry.slug,
+          kind: entry.kind,
+          name: entry.data.name,
+          summary: entry.data.summary,
+          difficulty: entry.data.difficulty,
+          municipalities: entry.data.municipalities,
+          tags: entry.data.tags,
+          length_m: Math.round(stats.length_m),
+          ascent_m: stats.elevation ? Math.round(stats.elevation.ascent_m) : null,
+          duration_minutes: entry.data.duration_minutes ?? null,
+          url: entry.url,
+        },
+        cover: cover
+          ? {
+              url: cover.thumb.url,
+              width: cover.thumb.width,
+              height: cover.thumb.height,
+              alt: photoAlt(cover.caption, entry.data.name, photos.indexOf(cover)),
+              eager: index === 0,
+            }
+          : null,
+      };
+    }),
+);
+
+const entries: EntryListItem[] = cards.map((card) => card.item);
 
 const description =
   'Sentieri e percorsi escursionistici di Piateda e dei comuni confinanti: statistiche calcolate dalle tracce GPX, mappa e download.';
@@ -55,7 +77,7 @@ const description =
         <p class="elenco__count" id={COUNT_ID} aria-live="polite">{formatResultCount(entries.length)}</p>
 
         <ul class="elenco__list" id={LIST_ID}>
-          {entries.map((entry) => <EntryCard entry={entry} />)}
+          {cards.map((card) => <EntryCard entry={card.item} cover={card.cover} />)}
         </ul>
 
         <div class="elenco__empty" id={EMPTY_STATE_ID} hidden>

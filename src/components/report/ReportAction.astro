@@ -1,0 +1,41 @@
+---
+/**
+ * "Segnala un problema" button in the detail page action bar (task 7.2, design D11).
+ *
+ * It only opens the panel further down the page, which holds the explanation and the link to
+ * the form; the panel is a <details>, so without JavaScript the visitor can still open it
+ * from its own summary. The button is rendered only when the form is configured.
+ */
+export interface Props {
+  /** Id of the panel it opens. */
+  panelId: string;
+}
+
+const { panelId } = Astro.props;
+---
+
+<button
+  class="report-action"
+  type="button"
+  data-report-open
+  aria-controls={panelId}
+  aria-expanded="false">Segnala un problema</button
+>
+
+<style>
+  /* Secondary action next to "Scarica il GPX", which owns the primary colour. */
+  .report-action {
+    flex: 0 1 auto;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: var(--font-weight-medium);
+    text-align: center;
+  }
+
+  .report-action:hover {
+    background: var(--color-surface-muted);
+  }
+</style>
