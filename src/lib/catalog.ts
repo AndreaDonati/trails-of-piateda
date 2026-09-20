@@ -9,6 +9,8 @@
  * - getTrack(entry)               – parsed GPX for an entry: stats, full-resolution line, simplified
  *                                   line, waypoints (memoised, see gpx.ts)
  * - readTrackBytes(entry)         – the original track.gpx bytes, for the download endpoint
+ * - getPhotos(entry)              – derived photos of an entry, sorted along the track, with the
+ *                                   URLs of the display and thumbnail images (memoised, see photos.ts)
  * - getOverview()                 – FeatureCollection of the entries with status open/maintenance,
  *                                   simplified geometry, properties listed in OverviewProperties
  * - entryUrl(kind, slug, base?)   – page URL: <base>/sentieri/<slug>/ or <base>/percorsi/<slug>/
@@ -23,6 +25,7 @@ import { join } from 'node:path';
 import type { CollectionEntry } from 'astro:content';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 import { loadTrack, type Track } from './gpx';
+import { loadPhotos, type DerivedPhoto } from './photos';
 
 export type Kind = 'trail' | 'route';
 
@@ -136,6 +139,20 @@ export function readTrackBytes(entry: CatalogEntry): Uint8Array<ArrayBuffer> {
   return new Uint8Array(readFileSync(join(entry.dir, TRACK_FILE)));
 }
 
+/**
+ * Photos of an entry, validated and positioned against its track (spec "Entry photos" and
+ * "Derived photo data"). Empty when the entry has no photos/ directory.
+ */
+export function getPhotos(entry: CatalogEntry): Promise<DerivedPhoto[]> {
+  return loadPhotos({
+    dir: entry.dir,
+    slug: entry.slug,
+    photos: entry.data.photos,
+    cover: entry.data.cover,
+    points: getTrack(entry).points,
+  });
+}
+
 export interface OverviewProperties {
   id: string;
   kind: Kind;
@@ -145,28 +162,34 @@ export interface OverviewProperties {
   /** null when the track has no elevation data. */
   ascent_m: number | null;
   url: string;
-  /** Number of photos; fixed at 0 until the photo pipeline (tasks in section 5) fills it. */
+  /**
+   * Number of photos of the entry. Only the count: the overview map shows no photos, and
+   * carrying their positions here would grow the single overview request for nothing (design D10).
+   */
   photos: number;
 }
 
 export async function getOverview(): Promise<FeatureCollection<LineString, OverviewProperties>> {
   const entries = (await getEntries()).filter((e) => e.data.status !== 'closed');
-  const features: Feature<LineString, OverviewProperties>[] = entries.map((e) => {
-    const track = getTrack(e);
-    return {
-      type: 'Feature',
-      geometry: track.simplified,
-      properties: {
-        id: e.slug,
-        kind: e.kind,
-        name: e.data.name,
-        difficulty: e.data.difficulty,
-        length_m: Math.round(track.stats.length_m),
-        ascent_m: track.stats.elevation ? Math.round(track.stats.elevation.ascent_m) : null,
-        url: e.url,
-        photos: 0,
-      },
-    };
-  });
+  const features = await Promise.all(
+    entries.map(async (e): Promise<Feature<LineString, OverviewProperties>> => {
+      const track = getTrack(e);
+      const photos = await getPhotos(e);
+      return {
+        type: 'Feature',
+        geometry: track.simplified,
+        properties: {
+          id: e.slug,
+          kind: e.kind,
+          name: e.data.name,
+          difficulty: e.data.difficulty,
+          length_m: Math.round(track.stats.length_m),
+          ascent_m: track.stats.elevation ? Math.round(track.stats.elevation.ascent_m) : null,
+          url: e.url,
+          photos: photos.length,
+        },
+      };
+    }),
+  );
   return { type: 'FeatureCollection', features };
 }

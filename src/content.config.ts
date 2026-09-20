@@ -57,6 +57,28 @@ const start = z
     message: 'start.lat and start.lon must be given together',
   });
 
+/**
+ * One entry of the optional `photos` list. `file` names a file inside the entry's photos/
+ * directory; whether it exists there, whether it is a JPEG within the limits and whether its
+ * position can be resolved is checked by src/lib/photos.ts, which sees the directory and can
+ * name the entry and the file in the error. Here only the shape is validated.
+ *
+ * Photos need not be listed at all: a geotagged file dropped in photos/ is published with its
+ * EXIF position. The list exists to add a caption, an author, or a position the file lacks.
+ */
+const photo = z
+  .object({
+    file: z.string().min(1, 'photos[].file must not be empty'),
+    caption: z.string().max(200, 'photos[].caption must be at most 200 characters').optional(),
+    lat: z.number().min(-90).max(90).optional(),
+    lon: z.number().min(-180).max(180).optional(),
+    author: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine((p) => (p.lat === undefined) === (p.lon === undefined), {
+    message: 'photos[].lat and photos[].lon must be given together',
+  });
+
 export const baseSchema = z
   .object({
     name: z.string().min(1, 'name must not be empty'),
@@ -77,6 +99,10 @@ export const baseSchema = z
     verified_on: isoDate.optional(),
     sources: z.array(z.string().min(1)).default([]),
     contributors: z.array(z.string().min(1)).default([]),
+    photos: z.array(photo).default([]),
+    // File name of the photo used as the entry's cover. Checked against photos/ in photos.ts:
+    // the file may be present on disk without appearing in the `photos` list above.
+    cover: z.string().min(1, 'cover must name a file inside photos/').optional(),
   })
   .strict();
 

@@ -35,7 +35,9 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm test
+
+      # Build before test on purpose: one test walks dist/ to assert that no
+      # original photo is published, and it skips itself when dist/ is absent.
       - run: npm run build
         env:
           SITE_URL: https://${{ github.repository_owner }}.github.io
@@ -51,6 +53,8 @@ jobs:
           PUBLIC_REPORT_FORM_URL: ${{ vars.PUBLIC_REPORT_FORM_URL }}
           PUBLIC_REPORT_FORM_FIELD_ENTRY: ${{ vars.PUBLIC_REPORT_FORM_FIELD_ENTRY }}
           PUBLIC_REPORT_FORM_FIELD_POSITION: ${{ vars.PUBLIC_REPORT_FORM_FIELD_POSITION }}
+
+      - run: npm test
 
       # Only a push to main produces a site that will actually be
       # published, so only that event uploads the artifact. Pull request

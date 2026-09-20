@@ -18,3 +18,17 @@ contributors:
   - Fixture
 description: |
   Testo segnaposto: il sentiero sale con tornanti regolari fino ad Ambria.
+# Fixture photos (see tests/fixtures/generate-photos.mjs): flat colour bands, not photographs.
+# ambria.jpg is deliberately absent from this list: a geotagged file dropped in photos/ needs
+# no metadata entry.
+cover: partenza-piateda.jpg
+photos:
+  - file: partenza-piateda.jpg
+    caption: Partenza dalla piazza della chiesa.
+    # The file carries no EXIF GPS on purpose: the position comes from here.
+    lat: 46.1611
+    lon: 9.9314
+    author: Fixture
+  - file: tornanti-val-venina.jpg
+    caption: I tornanti sopra la Val Venina.
+    author: Fixture
