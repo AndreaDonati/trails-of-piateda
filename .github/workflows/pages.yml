@@ -54,7 +54,7 @@ jobs:
       # published, so only that event uploads the artifact. Pull request
       # runs stop here: they validate the entry (build must succeed) but
       # never produce or expose a deployable artifact.
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
         with:
           path: dist
