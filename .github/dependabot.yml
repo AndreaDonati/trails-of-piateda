@@ -10,6 +10,12 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # astro check relies on TypeScript's programmatic API, which the 7.x
+      # native compiler does not expose yet. Pinned to 6.x on purpose; see
+      # https://github.com/withastro/roadmap/discussions/1321
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
 
   # The workflow's own actions (checkout, setup-node, deploy-pages, ...)
   - package-ecosystem: github-actions

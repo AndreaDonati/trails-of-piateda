@@ -15,19 +15,21 @@ on:
 permissions:
   contents: read
 
-# Only one Pages deployment at a time; do not cancel a deployment that is
-# already in progress, so a live site is never interrupted mid-publish.
+# One run per ref. Pushing again to the same branch supersedes the previous
+# run; a single shared group would instead let concurrent pull request runs
+# cancel each other, which is what happened on the first day of the repository.
+# The deploy job has its own group so that publishing is never interrupted.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -54,7 +56,7 @@ jobs:
       # published, so only that event uploads the artifact. Pull request
       # runs stop here: they validate the entry (build must succeed) but
       # never produce or expose a deployable artifact.
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
         with:
           path: dist
@@ -63,6 +65,11 @@ jobs:
     needs: build
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Serialise deployments and never cancel one in flight, so the live site is
+    # not interrupted mid-publish.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
@@ -71,4 +78,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
