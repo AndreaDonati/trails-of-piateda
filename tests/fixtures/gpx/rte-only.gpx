@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="fixture" xmlns="http://www.topografix.com/GPX/1/1">
+  <rte>
+    <name>Solo rotta</name>
+    <rtept lat="46.160" lon="9.930"><ele>330</ele></rtept>
+    <rtept lat="46.161" lon="9.931"><ele>340</ele></rtept>
+    <rtept lat="46.162" lon="9.932"><ele>350</ele></rtept>
+  </rte>
+</gpx>

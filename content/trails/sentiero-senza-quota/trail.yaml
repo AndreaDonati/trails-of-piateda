@@ -1,0 +1,7 @@
+# Fixture entry whose track has no <ele>: exercises the "elevation unavailable" path.
+name: Sentiero senza quota
+summary: Traccia registrata senza dati di quota.
+difficulty: T
+municipalities: [Piateda, Ponte in Valtellina]
+start:
+  name: Piateda, località Busteggia

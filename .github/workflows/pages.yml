@@ -1,0 +1,74 @@
+name: Build and deploy
+
+# Runs the build on every pull request (as a required status check, see
+# site-publishing spec "Pull request validation") and deploys to GitHub
+# Pages on every push to main (see "Deployment to GitHub Pages").
+# workflow_dispatch allows a manual re-run from the Actions tab.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Default token permissions for the whole workflow: read-only. The deploy
+# job elevates only the two permissions it needs (pages, id-token).
+permissions:
+  contents: read
+
+# Only one Pages deployment at a time; do not cancel a deployment that is
+# already in progress, so a live site is never interrupted mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          SITE_URL: https://${{ github.repository_owner }}.github.io
+          BASE_PATH: /${{ github.event.repository.name }}
+          # Optional report-form configuration (see docs/report-form.md).
+          # Read from repository *variables*, not secrets: they hold no
+          # sensitive data (public Google Form URL and public entry ids),
+          # and pull_request workflows triggered from a fork only ever get
+          # the default read-only token with no access to secrets — using
+          # vars keeps the build (and its tests of this behaviour) working
+          # the same way for fork PRs as for same-repo PRs, just with the
+          # report button absent because the values are empty there.
+          PUBLIC_REPORT_FORM_URL: ${{ vars.PUBLIC_REPORT_FORM_URL }}
+          PUBLIC_REPORT_FORM_FIELD_ENTRY: ${{ vars.PUBLIC_REPORT_FORM_FIELD_ENTRY }}
+          PUBLIC_REPORT_FORM_FIELD_POSITION: ${{ vars.PUBLIC_REPORT_FORM_FIELD_POSITION }}
+
+      # Only a push to main produces a site that will actually be
+      # published, so only that event uploads the artifact. Pull request
+      # runs stop here: they validate the entry (build must succeed) but
+      # never produce or expose a deployable artifact.
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

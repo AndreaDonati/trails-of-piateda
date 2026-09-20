@@ -1,0 +1,20 @@
+# Fixture entry: synthetic track (see tests/fixtures/generate-tracks.mjs), placeholder text.
+name: Piateda - Ambria
+summary: Salita da Piateda alla frazione di Ambria lungo la Val Venina.
+difficulty: E
+municipalities: [Piateda]
+start:
+  name: Piateda, piazza della chiesa
+  lat: 46.1612
+  lon: 9.9312
+signage: "CAI 305"
+duration_minutes: 150
+tags: [valle, frazione]
+status: open
+verified_on: 2025-06-01
+sources:
+  - Rilievo GPS
+contributors:
+  - Fixture
+description: |
+  Testo segnaposto: il sentiero sale con tornanti regolari fino ad Ambria.

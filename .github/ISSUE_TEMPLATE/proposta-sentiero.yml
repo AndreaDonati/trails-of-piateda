@@ -1,0 +1,95 @@
+name: Proponi un sentiero o un percorso
+description: Segnala un sentiero o un percorso da aggiungere al catalogo, senza aprire una pull request.
+title: "[Proposta] "
+labels:
+  - proposta
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usa questo modulo per proporre un sentiero o un percorso che non conosci
+        come aggiungere tramite pull request. Se hai già i file pronti
+        (`trail.yaml`/`route.yaml` e `track.gpx`), è più veloce aprire
+        direttamente una PR seguendo `CONTRIBUTING.md`.
+
+  - type: input
+    id: nome
+    attributes:
+      label: Nome del sentiero o percorso
+      placeholder: "Es. Sentiero Piateda - Ambria"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo
+      options:
+        - sentiero
+        - percorso
+    validations:
+      required: true
+
+  - type: input
+    id: comuni
+    attributes:
+      label: Comuni attraversati
+      placeholder: "Es. Piateda, Ardenno"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: difficolta
+    attributes:
+      label: Difficoltà
+      options:
+        - T
+        - E
+        - EE
+        - EEA
+    validations:
+      required: true
+
+  - type: textarea
+    id: descrizione
+    attributes:
+      label: Descrizione
+      description: Cosa rende interessante questo sentiero o percorso, punti di riferimento, periodo consigliato.
+    validations:
+      required: true
+
+  - type: input
+    id: partenza
+    attributes:
+      label: Punto di partenza
+      placeholder: "Nome del luogo o coordinate, es. 46.16, 9.93"
+    validations:
+      required: true
+
+  - type: textarea
+    id: segnaletica
+    attributes:
+      label: Note sulla segnaletica
+      description: Stato della segnaletica lungo il percorso (numeri di sentiero CAI, cartelli, bolli di vernice, tratti non segnalati).
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: gpx-disponibile
+    attributes:
+      label: Disponibilità della traccia GPX
+      options:
+        - label: Posso fornire il file GPX della traccia
+          required: false
+
+  - type: textarea
+    id: allegati
+    attributes:
+      label: Traccia GPX e foto
+      description: >-
+        Non è possibile allegare file direttamente in questo modulo. Dopo aver
+        creato la issue, trascina il file GPX e le eventuali foto in un
+        commento della issue stessa: GitHub li allega automaticamente e ne
+        inserisce il link.
+    validations:
+      required: false

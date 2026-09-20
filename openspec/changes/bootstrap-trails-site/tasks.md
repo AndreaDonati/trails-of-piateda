@@ -11,16 +11,16 @@
 
 ## 2. Catalog data model (spec: trail-catalog)
 
-- [ ] 2.1 Define `src/content.config.ts` with `trails` and `routes` collections (glob loader on `content/trails/*/trail.yaml` and `content/routes/*/route.yaml`, id = parent directory name), a shared Zod base schema (`name`, `summary` ≤200, `difficulty` enum T/E/EE/EEA, `municipalities` non-empty, `start`, optional `description`, `signage`, `duration_minutes`, `tags`, `status` default `open`, `verified_on`, `sources`, `contributors`), route-only `loop` and `trails: reference('trails')[]`, `.strict()` to reject unknown fields; verify with two fixture entries that `astro check`/`astro build` passes
-- [ ] 2.2 Add a build-time check that each entry directory name matches the slug regex and contains exactly `trail.yaml`/`route.yaml` plus `track.gpx` and optionally a `photos/` directory; verify with fixtures that a bad slug and a missing GPX each fail the build with an error naming the directory
-- [ ] 2.3 Write Vitest tests for the schema: missing `difficulty`, unknown field, route referencing a non-existent trail all fail with messages containing the entry id and the field; verify `npm test` passes
+- [x] 2.1 Define `src/content.config.ts` with `trails` and `routes` collections (glob loader on `content/trails/*/trail.yaml` and `content/routes/*/route.yaml`, id = parent directory name), a shared Zod base schema (`name`, `summary` ≤200, `difficulty` enum T/E/EE/EEA, `municipalities` non-empty, `start`, optional `description`, `signage`, `duration_minutes`, `tags`, `status` default `open`, `verified_on`, `sources`, `contributors`), route-only `loop` and `trails: reference('trails')[]`, `.strict()` to reject unknown fields; verify with two fixture entries that `astro check`/`astro build` passes
+- [x] 2.2 Add a build-time check that each entry directory name matches the slug regex and contains exactly `trail.yaml`/`route.yaml` plus `track.gpx` and optionally a `photos/` directory; verify with fixtures that a bad slug and a missing GPX each fail the build with an error naming the directory
+- [x] 2.3 Write Vitest tests for the schema: missing `difficulty`, unknown field, route referencing a non-existent trail all fail with messages containing the entry id and the field; verify `npm test` passes
 
 ## 3. GPX processing (spec: trail-catalog)
 
-- [ ] 3.1 Implement `src/lib/gpx.ts`: parse GPX with `@tmcw/togeojson` + `@xmldom/xmldom`, validate GPX 1.1, ≥1 `<trk>`, ≥2 points, all points inside the area-of-interest bbox constant (lat 45.95–46.35, lon 9.60–10.20), errors prefixed with the entry path; verify with Vitest fixtures (valid, `<rte>` only, point in Milan) that each case behaves as the spec scenarios say
-- [ ] 3.2 Implement statistics in the same module: haversine length, fixed-window elevation smoothing, ascent/descent, min/max, bbox, profile resampled at a fixed distance step, `elevation: null` when `<ele>` is absent plus a build warning; verify with a Vitest fixture of known length/ascent (tolerance documented in the test) and a no-elevation fixture
-- [ ] 3.3 Implement simplification for the overview (`@turf/simplify`, 5 m tolerance) and memoisation per entry within a build; verify with a test that no simplified vertex is farther than 5 m from the original line
-- [ ] 3.4 Add static endpoints `src/pages/data/[kind]/[slug].geojson.ts` (full geometry + waypoints), `src/pages/data/overview.geojson.ts` (non-closed entries, simplified, properties id/kind/name/difficulty/length_m/ascent_m/url) and `src/pages/gpx/[slug].gpx.ts` (original bytes); verify after `npm run build` that the files exist in `dist/`, the overview excludes a `closed` fixture, and `dist/gpx/<slug>.gpx` is byte-identical to `content/.../track.gpx`
+- [x] 3.1 Implement `src/lib/gpx.ts`: parse GPX with `@tmcw/togeojson` + `@xmldom/xmldom`, validate GPX 1.1, ≥1 `<trk>`, ≥2 points, all points inside the area-of-interest bbox constant (lat 45.95–46.35, lon 9.60–10.20), errors prefixed with the entry path; verify with Vitest fixtures (valid, `<rte>` only, point in Milan) that each case behaves as the spec scenarios say
+- [x] 3.2 Implement statistics in the same module: haversine length, fixed-window elevation smoothing, ascent/descent, min/max, bbox, profile resampled at a fixed distance step, `elevation: null` when `<ele>` is absent plus a build warning; verify with a Vitest fixture of known length/ascent (tolerance documented in the test) and a no-elevation fixture
+- [x] 3.3 Implement simplification for the overview (`@turf/simplify`, 5 m tolerance) and memoisation per entry within a build; verify with a test that no simplified vertex is farther than 5 m from the original line
+- [x] 3.4 Add static endpoints `src/pages/data/[kind]/[slug].geojson.ts` (full geometry + waypoints), `src/pages/data/overview.geojson.ts` (non-closed entries, simplified, properties id/kind/name/difficulty/length_m/ascent_m/url) and `src/pages/gpx/[slug].gpx.ts` (original bytes); verify after `npm run build` that the files exist in `dist/`, the overview excludes a `closed` fixture, and `dist/gpx/<slug>.gpx` is byte-identical to `content/.../track.gpx`
 
 ## 4. Browsing pages (spec: trail-browsing)
 
@@ -54,8 +54,8 @@
 
 ## 8. Contribution documentation (spec: site-publishing)
 
-- [ ] 8.1 Write `README.md` (project purpose, live URL, local setup, how the build validates data, how to swap tile providers, report-form configuration variables) and verify a fresh clone follows it to a running dev server
-- [ ] 8.2 Write `CONTRIBUTING.md` (directory layout, every metadata field with examples, GPX requirements incl. bbox and thinning advice, photo requirements: JPEG, ≤2 MB, ≤12 per entry, resize to 2000 px, geotag or manual lat/lon, rights and consent, EXIF stripping; how statistics are computed, data-license acceptance statement covering photos); verify by having a fixture entry added following only the document
+- [x] 8.1 Write `README.md` (project purpose, live URL, local setup, how the build validates data, how to swap tile providers, report-form configuration variables) and verify a fresh clone follows it to a running dev server
+- [x] 8.2 Write `CONTRIBUTING.md` (directory layout, every metadata field with examples, GPX requirements incl. bbox and thinning advice, photo requirements: JPEG, ≤2 MB, ≤12 per entry, resize to 2000 px, geotag or manual lat/lon, rights and consent, EXIF stripping; how statistics are computed, data-license acceptance statement covering photos); verify by having a fixture entry added following only the document
 - [ ] 8.3 Add `.github/PULL_REQUEST_TEMPLATE.md` (entry checklist: files present, fields filled, GPX inside area, photos within limits and rights owned, license accepted) and `.github/ISSUE_TEMPLATE/proposta-sentiero.yml` (form to propose a trail with optional GPX attachment); verify both render on GitHub when opening a PR/issue
 
 ## 9. Seed data and release

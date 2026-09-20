@@ -1,0 +1,8 @@
+# Fixture route with status closed: must be excluded from the overview file.
+name: Percorso chiuso
+summary: Percorso chiuso per frana, in attesa di ripristino.
+difficulty: EE
+municipalities: [Piateda, Albosaggia]
+start:
+  name: Piateda, ponte sull'Adda
+status: closed

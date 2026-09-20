@@ -1,0 +1,276 @@
+/* TrackMap island styles. Tokens only; hex values belong in src/styles/tokens.css. */
+
+.track-map {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  background: var(--color-surface-muted);
+  isolation: isolate;
+}
+
+.track-map__canvas {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+
+.track-map--unsupported {
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.track-map__status {
+  position: absolute;
+  top: var(--space-2);
+  left: 50%;
+  z-index: var(--z-overlay);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  transform: translateX(-50%);
+}
+
+.track-map__status--error {
+  top: auto;
+  bottom: var(--space-6);
+  color: var(--color-status-closed);
+}
+
+/* Hover tooltip (MapLibre Popup with our class). */
+.track-map__tooltip .maplibregl-popup-content {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  pointer-events: none;
+}
+
+/* Legend: collapsible, top-left under nothing (controls sit top-right). */
+.track-map__legend {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-panel);
+  max-width: calc(100% - var(--space-8) - var(--space-4));
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-size-sm);
+}
+
+.track-map__legend summary {
+  cursor: pointer;
+  font-weight: var(--font-weight-medium);
+}
+
+.track-map__legend ul {
+  margin: var(--space-2) 0 var(--space-1);
+  padding: 0;
+  list-style: none;
+}
+
+.track-map__legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.track-map__swatch {
+  flex: none;
+  width: 1.5rem;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+  box-shadow: 0 0 0 2px var(--color-track-casing);
+}
+
+.track-map__swatch[data-difficulty="T"] {
+  background: var(--color-difficulty-t);
+}
+
+.track-map__swatch[data-difficulty="E"] {
+  background: var(--color-difficulty-e);
+}
+
+.track-map__swatch[data-difficulty="EE"] {
+  background: var(--color-difficulty-ee);
+}
+
+.track-map__swatch[data-difficulty="EEA"] {
+  background: var(--color-difficulty-eea);
+}
+
+.track-map__swatch--trail {
+  background: var(--color-text);
+}
+
+.track-map__swatch--route {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-text) 0 6px,
+    transparent 6px 10px
+  );
+}
+
+/* Selection panel: bottom sheet on mobile, side column on desktop (design D12). */
+.track-map__panel {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-panel);
+  max-height: 55%;
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  overflow-y: auto;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.track-map__close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+}
+
+.track-map__close:hover {
+  background: var(--color-border);
+}
+
+.track-map__kind {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.track-map__title {
+  margin: 0 var(--space-6) var(--space-2) 0;
+  font-size: var(--font-size-lg);
+}
+
+.track-map__muted {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.track-map__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.track-map__stats dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.track-map__stats dd {
+  margin: 0;
+  font-weight: var(--font-weight-bold);
+}
+
+.track-map__cta {
+  display: inline-block;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.track-map__cta:hover {
+  background: var(--color-primary-strong);
+  color: var(--color-on-primary);
+}
+
+@media (min-width: 768px) {
+  .track-map__panel {
+    position: static;
+    flex: 0 0 20rem;
+    max-height: none;
+    border-radius: 0;
+    border-left: 1px solid var(--color-border);
+    box-shadow: none;
+  }
+
+  .track-map__close {
+    top: var(--space-3);
+    right: var(--space-3);
+  }
+}
+
+/* Start / end / waypoint markers (DOM markers, so they follow the tokens). */
+.track-marker {
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--color-track-casing);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.track-marker--end {
+  border-radius: var(--radius-sm);
+  background: var(--color-text);
+}
+
+.track-marker--waypoint {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+  background: var(--color-surface);
+  border-color: var(--color-text);
+}
+
+.track-marker__label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  max-width: 10rem;
+  margin-top: 2px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xs);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  box-shadow: var(--shadow-sm);
+}
+
+/* MapLibre control tweaks so they read with the site font. */
+.track-map .maplibregl-ctrl-attrib {
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-xs);
+}

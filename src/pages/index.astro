@@ -1,15 +1,22 @@
 ---
 // Placeholder page: replaced by the trail list in task 4.5.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TrackMap from '../components/map/TrackMap';
 ---
-<!doctype html>
-<html lang="it">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sentieri di Piateda</title>
-  </head>
-  <body>
+
+<BaseLayout
+  title="Sentieri di Piateda"
+  description="Catalogo dei sentieri e dei percorsi escursionistici di Piateda (SO), con mappa 3D e tracce GPX scaricabili."
+>
+  <div class="container">
     <h1>Sentieri di Piateda</h1>
-    <p>Sito in costruzione.</p>
-  </body>
-</html>
+    <p>Sito in costruzione: l'elenco dei sentieri arriverà con la prossima versione.</p>
+  </div>
+  <TrackMap client:only="react" dataUrl="/data/overview.geojson" mode="overview" fit="data" />
+</BaseLayout>
+
+<style>
+  .container {
+    padding-block: var(--space-6);
+  }
+</style>

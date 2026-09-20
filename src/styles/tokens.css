@@ -1,0 +1,104 @@
+/*
+ * Design tokens (design D12). This is the only stylesheet allowed to contain
+ * literal colour values; every other CSS file, Astro scoped style and React
+ * component must reference these custom properties.
+ *
+ * Colour values come from Open Color 1.9 (MIT, https://yeun.github.io/open-color/).
+ * The four difficulty colours are duplicated in src/lib/mapConfig.ts because
+ * MapLibre paint properties cannot read CSS variables; tests/mapConfig.test.ts
+ * asserts the two sets stay identical.
+ *
+ * Breakpoints (media queries cannot read custom properties, so these are
+ * documentation; keep them in sync with the @media rules in the components):
+ *   md: 768px   tablet / small desktop
+ *   lg: 1024px  desktop
+ */
+:root {
+  /* Brand: Open Color green scale */
+  --color-primary: #2f9e44;        /* green 8 */
+  --color-primary-strong: #2b8a3e; /* green 9, hover / active */
+  --color-primary-soft: #ebfbee;   /* green 0, tinted backgrounds */
+  --color-on-primary: #ffffff;
+
+  /* Neutrals: Open Color gray scale */
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8f9fa;    /* gray 0 */
+  --color-surface-muted: #f1f3f5;  /* gray 1 */
+  --color-border: #dee2e6;         /* gray 3 */
+  --color-border-strong: #ced4da;  /* gray 4 */
+  --color-text: #212529;           /* gray 9 */
+  --color-text-muted: #495057;     /* gray 7 */
+  --color-text-subtle: #868e96;    /* gray 6 */
+  --color-text-inverse: #ffffff;
+
+  /* Difficulty (CAI scale, ski-slope convention: T green, E blue, EE red, EEA black).
+     Green is a dark saturated step because a light green line disappears over
+     OpenTopoMap; the white casing (--color-track-casing) does the rest. */
+  --color-difficulty-t: #2b8a3e;   /* green 9 */
+  --color-difficulty-e: #1971c2;   /* blue 8 */
+  --color-difficulty-ee: #e03131;  /* red 8 */
+  --color-difficulty-eea: #212529; /* gray 9 */
+  --color-on-difficulty: #ffffff;  /* badge text: all four steps are dark enough for white */
+  --color-track-casing: #ffffff;
+
+  /* Status */
+  --color-status-open: #2f9e44;        /* green 8 */
+  --color-status-warning: #f08c00;     /* yellow 8 */
+  --color-status-warning-bg: #fff9db;  /* yellow 0 */
+  --color-status-closed: #e03131;      /* red 8 */
+  --color-status-closed-bg: #fff5f5;   /* red 0 */
+
+  /* Interaction */
+  --color-focus: #228be6;          /* blue 6 */
+  --color-link: #1971c2;           /* blue 8 */
+  --color-link-hover: #1864ab;     /* blue 9 */
+  --color-backdrop: rgb(33 37 41 / 45%);
+
+  /* Typography: system stack, no web font (design D12) */
+  --font-family-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --line-height-body: 1.5;
+  --line-height-heading: 1.2;
+
+  /* Spacing (4 px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 12%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 16%);
+
+  /* Layout */
+  --content-max-width: 1200px;
+  --header-height: 3.5rem;
+  --z-header: 100;
+  --z-panel: 20;
+  --z-overlay: 30;
+
+  /* Breakpoints, as documentation only (see file header) */
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+}

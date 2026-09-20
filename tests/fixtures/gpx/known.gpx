@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="fixture" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="46.160" lon="9.930"><name>Partenza</name></wpt>
+  <trk>
+    <name>Known</name>
+    <trkseg>
+      <trkpt lat="46.160" lon="9.930"><ele>100</ele></trkpt>
+      <trkpt lat="46.161" lon="9.930"><ele>110</ele></trkpt>
+      <trkpt lat="46.162" lon="9.930"><ele>120</ele></trkpt>
+      <trkpt lat="46.163" lon="9.930"><ele>130</ele></trkpt>
+      <trkpt lat="46.164" lon="9.930"><ele>140</ele></trkpt>
+      <trkpt lat="46.165" lon="9.930"><ele>150</ele></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="46.166" lon="9.930"><ele>160</ele></trkpt>
+      <trkpt lat="46.167" lon="9.930"><ele>170</ele></trkpt>
+      <trkpt lat="46.168" lon="9.930"><ele>180</ele></trkpt>
+      <trkpt lat="46.169" lon="9.930"><ele>190</ele></trkpt>
+      <trkpt lat="46.170" lon="9.930"><ele>200</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

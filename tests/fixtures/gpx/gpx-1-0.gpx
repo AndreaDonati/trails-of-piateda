@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.0" creator="fixture" xmlns="http://www.topografix.com/GPX/1/0">
+  <trk>
+    <trkseg>
+      <trkpt lat="46.160" lon="9.930"><ele>330</ele></trkpt>
+      <trkpt lat="46.161" lon="9.931"><ele>340</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

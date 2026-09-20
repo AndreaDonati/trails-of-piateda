@@ -1,0 +1,13 @@
+# Fixture route: a loop that includes the piateda-ambria trail.
+name: Anello di Piateda Alta
+summary: Giro ad anello sopra Piateda con vista sulla Valtellina.
+difficulty: E
+municipalities: [Piateda]
+start:
+  name: Piateda Alta
+  lat: 46.152
+  lon: 9.952
+loop: true
+trails: [piateda-ambria]
+duration_minutes: 240
+verified_on: "2025-05-10"
