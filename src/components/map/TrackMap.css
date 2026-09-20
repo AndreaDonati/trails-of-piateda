@@ -13,7 +13,9 @@
 .track-map__canvas {
   flex: 1 1 auto;
   min-width: 0;
-  height: 100%;
+  /* No `height: 100%`: the parent is a flex row, so the default `align-items: stretch`
+     already gives the canvas the full cross size, and it does so even when the parent's
+     own height comes from being stretched (a percentage would resolve to auto there). */
 }
 
 .track-map--unsupported {

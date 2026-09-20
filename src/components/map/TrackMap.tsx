@@ -27,6 +27,15 @@ import {
   type StyleSpecification,
 } from 'maplibre-gl';
 import type { FeatureCollection, Position } from 'geojson';
+import { setWorkerUrl } from 'maplibre-gl';
+// MapLibre resolves its worker as `new URL('./maplibre-gl-worker.mjs', import.meta.url)`
+// relative to its own module. Astro bundles the library into a hashed chunk and emits no
+// such sibling, so that request 404s, no worker starts, the style never finishes loading
+// and the map hangs on "Caricamento". `?worker&url` makes Vite build the worker as its own
+// entry, bundling the `maplibre-gl-shared` chunk it imports, and hands back a hashed,
+// base-aware URL. A plain `?url` would copy the file alone and its relative import of the
+// shared chunk would 404 in turn.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './TrackMap.css';
 import {
@@ -120,6 +129,8 @@ type Status = 'loading' | 'ready' | 'unsupported';
 const UNSUPPORTED_MESSAGE = 'La mappa interattiva non è disponibile su questo browser.';
 const FIT_PADDING = 48;
 const INTERACTIVE_LAYERS: string[] = [LAYER_IDS.trail, LAYER_IDS.route];
+setWorkerUrl(maplibreWorkerUrl);
+
 const DEM_SOURCE_IDS: ReadonlySet<string> = new Set([SOURCE_IDS.terrain, SOURCE_IDS.hillshade]);
 
 /**

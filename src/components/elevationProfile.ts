@@ -14,7 +14,10 @@ export const VIEWBOX_WIDTH = 1000;
 export const VIEWBOX_HEIGHT = 260;
 
 /** Room for the elevation labels on the left and the distance labels underneath. */
-export const PADDING = { top: 14, right: 14, bottom: 26, left: 54 } as const;
+// Left padding holds the elevation labels, drawn right-aligned 8 units inside it at the
+// 20-unit font size of `.profile__label`. Four digits plus the unit need about 62 units;
+// 54 clipped the first digit of a four-figure elevation (measured on a 1010 m track).
+export const PADDING = { top: 14, right: 14, bottom: 26, left: 78 } as const;
 
 /**
  * Upper bound on the number of drawn points. A 25 m resampling step (PROFILE_STEP_M) gives

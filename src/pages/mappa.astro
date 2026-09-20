@@ -27,7 +27,7 @@ const description =
       exaggeration={DEFAULT_TERRAIN_EXAGGERATION}
       fit="data"
       legend
-      height="100%"
+      height="auto"
     />
   </div>
 </BaseLayout>
@@ -35,8 +35,18 @@ const description =
 <style>
   .mappa {
     flex: 1 1 auto;
+    display: flex;
     /* Without a minimum the flex item collapses on browsers that resolve the parent's
        min-height late; 60vh keeps the map usable in that case. */
     min-height: max(60vh, 320px);
+  }
+
+  /* The map fills this box by flex stretch, not by `height: 100%`. This element takes its
+     own height from being stretched inside the page, so its computed height stays `auto`
+     and a percentage on the child would resolve against nothing (measured in Chrome: the
+     map collapsed to its 320px minimum). The island renders with `display: contents`, so
+     the map element is the flex item here. */
+  .mappa :global(.track-map) {
+    flex: 1 1 auto;
   }
 </style>
