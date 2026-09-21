@@ -186,6 +186,7 @@ Not applicable as a migration (nothing exists). Rollout order: repository and Pa
 
 - Neighbouring municipalities list for the `municipalities` validation (Piateda plus which names exactly). Default: accept any string but require at least one entry; a curated list can be added as an enum later without changing behaviour for valid data.
 - Live hover link between elevation profile and map position: nice-to-have, deferred; does not change specs.
+- Base map labels rotate with the map, because OpenTopoMap is raster and the names are drawn into the tiles. Left as it is on 2026-09-21; the alternatives (locking the bearing, a vector base map, or a vector base map plus contours generated from the DEM already loaded) are recorded in issue #6 of the repository.
 - Reporting a problem on a trail that is not in the catalog: not offered; a generic link to the form could be added to the "Contribuisci" page later without changing behaviour of detail pages.
 - Photo formats beyond JPEG (HEIC from iPhones): out of scope; CONTRIBUTING asks for JPEG export. Could be added later with a converter step without changing behaviour for JPEG.
 - Whether the owner's GPX files include `<ele>`. If most do not, a follow-up change could add build-time elevation lookup from the DEM tiles; the spec already covers the "unavailable" case.
