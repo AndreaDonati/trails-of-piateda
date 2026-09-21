@@ -90,10 +90,42 @@ export const LAYER_IDS = {
   casing: 'tracks-casing',
   trail: 'tracks-trail',
   route: 'tracks-route',
+  /** Invisible wide line over the track source; the only layer hover and click query. */
+  hit: 'tracks-hit',
 } as const;
 
 /** Overview default; mountain relief around Piateda reads better slightly exaggerated. */
 export const DEFAULT_TERRAIN_EXAGGERATION = 1.2;
+
+// --- Camera pitch ---------------------------------------------------------------
+
+/**
+ * Degrees of pitch per pixel of vertical drag, passed as the `pitchSpeed` option of `Map`.
+ *
+ * MapLibre's default is -0.5 (node_modules/maplibre-gl/src/ui/map.ts), which tilts the camera
+ * toward the horizon when the pointer is dragged *up*: the Mapbox/MapLibre convention. This
+ * site follows the opposite one, used by Google Maps and Google Earth, where dragging *down*
+ * tilts toward the horizon, because that is what the site owner reads as the natural
+ * direction. Flipping the sign of this constant reverses the gesture and restores MapLibre's
+ * default; the magnitude is MapLibre's and is not part of the decision.
+ *
+ * Only the drag on the map canvas reads this value. The compass of `NavigationControl` with
+ * `visualizePitch` pitches with its own hard-coded -0.5
+ * (node_modules/maplibre-gl/src/ui/control/navigation_control.ts), which no public option
+ * exposes.
+ */
+export const PITCH_DRAG_SPEED = 0.5;
+
+/**
+ * Pitch range of every map on the site. 70° is short of MapLibre's 85° maximum: past roughly
+ * 70° the OpenTopoMap raster stretches into unreadable smears near the horizon and the tile
+ * count grows fast for pixels nobody reads.
+ */
+export const MIN_PITCH = 0;
+export const MAX_PITCH = 70;
+
+/** Degrees added or removed by one press of a pitch button: five presses cross the range. */
+export const PITCH_STEP = 15;
 
 /** Combined attribution for pages that show both providers (footer, overview). */
 export const OVERVIEW_ATTRIBUTION = `${BASEMAP_ATTRIBUTION} | ${TERRAIN_ATTRIBUTION}`;

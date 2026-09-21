@@ -23,7 +23,7 @@ import {
   TerrainControl,
   type ErrorEvent,
   type ExpressionSpecification,
-  type MapLayerMouseEvent,
+  type MapMouseEvent,
   type StyleSpecification,
 } from 'maplibre-gl';
 import type { FeatureCollection, Position } from 'geojson';
@@ -54,6 +54,9 @@ import {
   LAYER_IDS,
   LINE_WIDTH,
   LINE_WIDTH_HOVER,
+  MAX_PITCH,
+  MIN_PITCH,
+  PITCH_DRAG_SPEED,
   SOURCE_IDS,
   type Difficulty,
 } from '../../lib/mapConfig';
@@ -69,6 +72,15 @@ import {
   kindLabel,
 } from './format';
 import { classifyDemError, shouldDropTerrain } from './terrain';
+import {
+  HIT_LAYERS,
+  detectPointerKind,
+  hitLineWidthPx,
+  queryBox,
+  queryTolerancePx,
+  type PointerKind,
+} from './hitTest';
+import { PitchControl } from './PitchControl';
 import {
   collectionBounds,
   isLineFeature,
@@ -128,7 +140,6 @@ type Status = 'loading' | 'ready' | 'unsupported';
 
 const UNSUPPORTED_MESSAGE = 'La mappa interattiva non è disponibile su questo browser.';
 const FIT_PADDING = 48;
-const INTERACTIVE_LAYERS: string[] = [LAYER_IDS.trail, LAYER_IDS.route];
 setWorkerUrl(maplibreWorkerUrl);
 
 const DEM_SOURCE_IDS: ReadonlySet<string> = new Set([SOURCE_IDS.terrain, SOURCE_IDS.hillshade]);
@@ -220,7 +231,7 @@ function attachDemFailureHandler(map: MapLibreMap, terrainControl: TerrainContro
 
 // --- Tracks --------------------------------------------------------------------------
 
-function addTrackLayers(map: MapLibreMap, data: FeatureCollection): void {
+function addTrackLayers(map: MapLibreMap, data: FeatureCollection, pointer: PointerKind): void {
   const lines: FeatureCollection = {
     type: 'FeatureCollection',
     features: data.features.filter(isLineFeature),
@@ -263,12 +274,37 @@ function addTrackLayers(map: MapLibreMap, data: FeatureCollection): void {
       ...(DASH_PATTERNS.route ? { 'line-dasharray': DASH_PATTERNS.route } : {}),
     },
   });
+
+  // Hit area (see ./hitTest). Last, so it is the topmost layer and the first the query walks;
+  // `line-opacity: 0` keeps it out of everything that is drawn, and it carries no `kind`
+  // filter so it covers exactly the set of features the casing draws — every track, including
+  // one whose `kind` neither coloured layer matches.
+  map.addLayer({
+    id: LAYER_IDS.hit,
+    type: 'line',
+    source: SOURCE_IDS.tracks,
+    layout,
+    paint: { 'line-opacity': 0, 'line-width': hitLineWidthPx(pointer) },
+  });
 }
 
-/** Hover highlight + name tooltip on both track layers; click reports the feature properties. */
+/**
+ * Hover highlight + name tooltip; click reports the feature properties.
+ *
+ * Both read the same query — the hit layer of ./hitTest, over a square around the pointer —
+ * so anything that highlights can be clicked and nothing selects that never highlighted. That
+ * is why hover is a plain `mousemove` on the map and not the layer-scoped `mousemove` +
+ * `mouseleave` pair: MapLibre queries those at the bare pointer position, which would make
+ * hover the narrower of the two.
+ *
+ * The hover feature-state and the tooltip still key off the feature of the track source, so
+ * the casing and line hover widths respond exactly as before; the hit layer only decides
+ * which feature is under the pointer, never what is drawn for it.
+ */
 function attachTrackInteraction(
   map: MapLibreMap,
   onSelect: ((properties: TrackProperties | null) => void) | undefined,
+  pointer: PointerKind,
 ): void {
   const tooltip = new Popup({
     closeButton: false,
@@ -276,6 +312,7 @@ function attachTrackInteraction(
     offset: 12,
     className: 'track-map__tooltip',
   });
+  const tolerance = queryTolerancePx(pointer);
   let hoveredId: string | number | undefined;
 
   const setHover = (id: string | number | undefined) => {
@@ -288,23 +325,32 @@ function attachTrackInteraction(
     }
   };
 
-  map.on('mousemove', INTERACTIVE_LAYERS, (e: MapLayerMouseEvent) => {
-    const feature = e.features?.[0];
-    if (!feature) return;
+  const trackAt = (point: { x: number; y: number }) =>
+    map.queryRenderedFeatures(queryBox(point, tolerance), { layers: HIT_LAYERS })[0];
+
+  const clearHover = () => {
+    map.getCanvas().style.cursor = '';
+    setHover(undefined);
+    tooltip.remove();
+  };
+
+  map.on('mousemove', (e: MapMouseEvent) => {
+    const feature = trackAt(e.point);
+    if (!feature) {
+      if (hoveredId !== undefined) clearHover();
+      return;
+    }
     map.getCanvas().style.cursor = 'pointer';
     if (feature.id !== hoveredId) setHover(feature.id);
     const name = typeof feature.properties?.name === 'string' ? feature.properties.name : '';
     tooltip.setLngLat(e.lngLat).setText(name).addTo(map);
   });
-  map.on('mouseleave', INTERACTIVE_LAYERS, () => {
-    map.getCanvas().style.cursor = '';
-    setHover(undefined);
-    tooltip.remove();
-  });
+  // The pointer can leave the canvas without ever passing over empty map.
+  map.on('mouseout', clearHover);
 
   if (!onSelect) return;
   map.on('click', (e) => {
-    const hit = map.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0];
+    const hit = trackAt(e.point);
     onSelect(hit ? (hit.properties as TrackProperties) : null);
   });
 }
@@ -534,6 +580,9 @@ export default function TrackMap({
 
     let cancelled = false;
     let map: MapLibreMap | null = null;
+    // Read once: the hit-area width is baked into the layer, and a device that gains a mouse
+    // mid-session is not worth rebuilding the map for.
+    const pointer = detectPointerKind();
     const markers: Marker[] = [];
     let detachReportPicking: (() => void) | null = null;
     let detachPhotos: (() => void) | null = null;
@@ -557,7 +606,10 @@ export default function TrackMap({
         style: buildStyle(),
         center: DEFAULT_CENTER,
         zoom: DEFAULT_ZOOM,
-        maxPitch: 70,
+        minPitch: MIN_PITCH,
+        maxPitch: MAX_PITCH,
+        // Reverses MapLibre's drag direction; see PITCH_DRAG_SPEED in lib/mapConfig.
+        pitchSpeed: PITCH_DRAG_SPEED,
         attributionControl: false,
         locale: LOCALE,
         ...(bounds ? { bounds, fitBoundsOptions: { padding: FIT_PADDING } } : {}),
@@ -566,6 +618,9 @@ export default function TrackMap({
 
       created.addControl(new AttributionControl({ compact: false }), 'bottom-right');
       created.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
+      // Between the compass and the terrain toggle: the three are what move or reshape the
+      // camera, and the pitch buttons are the only way to tilt that needs no modifier key.
+      created.addControl(new PitchControl(), 'top-right');
       const terrainControl = new TerrainControl({ source: SOURCE_IDS.terrain, exaggeration });
       created.addControl(terrainControl, 'top-right');
       attachDemFailureHandler(created, terrainControl);
@@ -573,8 +628,8 @@ export default function TrackMap({
       created.on('load', () => {
         if (cancelled) return;
         if (terrainEnabled) created.setTerrain({ source: SOURCE_IDS.terrain, exaggeration });
-        addTrackLayers(created, data);
-        attachTrackInteraction(created, mode === 'overview' ? setSelected : undefined);
+        addTrackLayers(created, data, pointer);
+        attachTrackInteraction(created, mode === 'overview' ? setSelected : undefined, pointer);
         if (mode === 'detail') addDetailMarkers(created, data, markers);
         // Only where the page says the report form is configured: with no panel to talk to,
         // the listener and its marker would be behaviour reachable by a stray `report:pick`.

@@ -284,6 +284,23 @@
   font-size: var(--font-size-xs);
 }
 
+/* Pitch buttons (see PitchControl). The card, the 29 px button box and the disabled dimming
+   come from maplibre-gl.css via the two MapLibre classes; only the icon layout and its
+   colour are ours. The icons are drawn with `currentColor`, so the colour is set here once
+   and nothing in the SVG carries a literal. */
+.track-map__pitch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+}
+
+.track-map__pitch-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Report point marker (task 7.3): a single marker the visitor moves with a click, in the
    warning colour so it reads as "problem here" rather than as part of the track. */
 .track-marker--report {
