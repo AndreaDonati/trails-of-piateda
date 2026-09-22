@@ -27,6 +27,7 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
 const navItems = [
   { label: 'Elenco', href: withBase('/') },
   { label: 'Mappa', href: withBase('/mappa/') },
+  { label: 'Manutenzione', href: withBase('/manutenzione/') },
   { label: 'Contribuisci', href: withBase('/contribuisci/') },
 ];
 
@@ -153,6 +154,9 @@ const currentPath = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${A
 
   .site-nav {
     display: flex;
+    /* Four items no longer fit on one 360 px line at every text size, so the row wraps
+       instead of pushing the header wider than the viewport. */
+    flex-wrap: wrap;
     gap: var(--space-1);
     margin: 0;
     padding: 0;

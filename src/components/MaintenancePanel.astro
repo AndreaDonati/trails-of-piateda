@@ -1,0 +1,292 @@
+---
+/**
+ * Maintenance section of a detail page (tasks 4.1/4.3/4.4, design D6).
+ *
+ * Sits after the hiking content and is addressed to whoever works on the trail, not to
+ * whoever walks it: the heading says so, the intro line repeats it, and the box is drawn
+ * apart from the hiking sections so a hiker scrolling past can tell it is not for them.
+ * Mixing person-hours and minimum team size into the hiking facts would invite reading the
+ * effort as walking time, which is exactly what D6 avoids.
+ *
+ * What appears, in which order and how each condition state is worded is decided by
+ * `maintenanceView` in maintenancePanel.ts; this template only lays it out. The component
+ * renders nothing at all when the entry declares no maintenance block, so a page that always
+ * includes it emits no empty section.
+ */
+import { maintenanceView, type MaintenanceViewInput } from './maintenancePanel';
+
+export interface Props {
+  /** The result of `getMaintenance(entry)`. */
+  maintenance: MaintenanceViewInput;
+}
+
+const view = maintenanceView(Astro.props.maintenance);
+const HEADING_ID = 'titolo-manutenzione';
+---
+
+{
+  view && (
+    <section class="maintenance" aria-labelledby={HEADING_ID}>
+      <h2 id={HEADING_ID}>Per chi fa manutenzione</h2>
+      <p class="maintenance__intro">
+        Queste informazioni servono a chi cura l'itinerario, non a chi lo percorre.
+      </p>
+
+      {view.condition && (
+        <div
+          class="maintenance__condition"
+          data-state={view.condition.state}
+          data-attention={view.condition.needsAttention ? 'true' : 'false'}
+        >
+          <p class="maintenance__condition-label">{view.condition.label}</p>
+          {view.condition.level && <p class="maintenance__level">{view.condition.level}</p>}
+          <p class="maintenance__condition-detail">{view.condition.detail}</p>
+        </div>
+      )}
+
+      {view.facts.length > 0 && (
+        <dl class="maintenance__facts">
+          {view.facts.map((fact) => (
+            <div class="maintenance__fact">
+              <dt>{fact.label}</dt>
+              <dd>
+                {fact.value}
+                {fact.hint && <span class="maintenance__hint">{fact.hint}</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {view.notes && (
+        <div class="maintenance__notes">
+          <h3>Note</h3>
+          <p>{view.notes}</p>
+        </div>
+      )}
+
+      {view.interventions && (
+        <div class="maintenance__log">
+          <h3>Interventi registrati</h3>
+
+          {/* Outside the <details> on purpose: the date of the most recent intervention must be
+              readable without any interaction, and it is the one that says whether the recorded
+              condition still means anything. */}
+          <ul class="maintenance__list">
+            <li class="maintenance__entry">
+              <p class="maintenance__entry-date">
+                <time datetime={view.interventions.latest.date}>{view.interventions.latest.dateLabel}</time>
+              </p>
+              <p class="maintenance__entry-summary">{view.interventions.latest.summary}</p>
+              {view.interventions.latest.details.length > 0 && (
+                <ul class="maintenance__entry-details">
+                  {view.interventions.latest.details.map((detail) => (
+                    <li>{detail}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          </ul>
+
+          {view.interventions.olderLabel && (
+            <details class="maintenance__older">
+              <summary>{view.interventions.olderLabel}</summary>
+              <ul class="maintenance__list">
+                {view.interventions.older.map((intervention) => (
+                  <li class="maintenance__entry">
+                    <p class="maintenance__entry-date">
+                      <time datetime={intervention.date}>{intervention.dateLabel}</time>
+                    </p>
+                    <p class="maintenance__entry-summary">{intervention.summary}</p>
+                    {intervention.details.length > 0 && (
+                      <ul class="maintenance__entry-details">
+                        {intervention.details.map((detail) => (
+                          <li>{detail}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+<style>
+  /* The box, the muted ground and the dashed rule under the heading are what mark the change
+     of audience; the hiking sections above are drawn on the page background. */
+  .maintenance {
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-muted);
+  }
+
+  .maintenance h2 {
+    padding-bottom: var(--space-2);
+    border-bottom: 1px dashed var(--color-border-strong);
+    font-size: var(--font-size-lg);
+  }
+
+  .maintenance__intro {
+    margin-block: var(--space-2) var(--space-4);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .maintenance h3 {
+    margin-bottom: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .maintenance__condition {
+    padding: var(--space-3);
+    border-left: 4px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+  }
+
+  /* needs-check and superseded: the recorded level does not describe the trail as it is now,
+     so it is marked as a caution rather than printed like a fact. */
+  .maintenance__condition[data-attention='true'] {
+    border-left-color: var(--color-status-warning);
+    background: var(--color-status-warning-bg);
+  }
+
+  .maintenance__condition p {
+    margin: 0;
+  }
+
+  .maintenance__condition-label {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .maintenance__level {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .maintenance__condition-detail {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .maintenance__facts {
+    display: grid;
+    /* One column at 360 px, two as soon as two fit: the values are short but the tool list is
+       not, and min() keeps the track from forcing the page wider than the viewport. */
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: var(--space-3);
+    margin-block: var(--space-4);
+  }
+
+  .maintenance__fact {
+    min-width: 0;
+  }
+
+  .maintenance__fact dt {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .maintenance__fact dd {
+    margin: 0;
+    font-weight: var(--font-weight-medium);
+    overflow-wrap: anywhere;
+  }
+
+  .maintenance__hint {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-regular);
+  }
+
+  .maintenance__notes {
+    margin-block: var(--space-4);
+  }
+
+  .maintenance__notes p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .maintenance__log {
+    margin-top: var(--space-4);
+  }
+
+  .maintenance__list {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .maintenance__entry {
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+  }
+
+  .maintenance__entry p {
+    margin: 0;
+  }
+
+  .maintenance__entry-date {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .maintenance__entry-summary {
+    overflow-wrap: anywhere;
+  }
+
+  .maintenance__entry-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+    margin-block: var(--space-2) 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .maintenance__entry-details li {
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+  }
+
+  .maintenance__older {
+    margin-top: var(--space-3);
+  }
+
+  .maintenance__older summary {
+    padding: var(--space-2) 0;
+    color: var(--color-link);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+
+  .maintenance__older .maintenance__list {
+    margin-top: var(--space-2);
+  }
+</style>

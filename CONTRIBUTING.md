@@ -128,6 +128,82 @@ siano confrontabili tra loro. L'unico dato temporale che puoi indicare a mano è
 - Devi avere i diritti sulle foto che carichi. Non caricare foto con persone
   riconoscibili senza il loro consenso.
 
+## Manutenzione dei sentieri
+
+Un gruppo di volontari del comune si occupa di tenere puliti i sentieri. La scheda di una
+voce può portare le informazioni che servono a organizzare un intervento. Tutto il blocco
+`maintenance` è facoltativo, e una voce che non ce l'ha funziona esattamente come prima.
+
+```yaml
+maintenance:
+  condition: da_sfoltire        # buono | da_sfoltire | invaso
+  condition_checked_on: 2026-07-10
+  tools: [decespugliatore, roncola]
+  effort_person_hours: 8
+  min_people: 2
+  notes: Il tratto sopra i tornanti si richiude in fretta dopo le piogge.
+  interventions:
+    - date: 2026-06-20
+      summary: Sfoltita la vegetazione sui tornanti.
+      people: 4                 # facoltativo
+      person_hours: 10          # facoltativo
+      tools: [decespugliatore]  # facoltativo
+      by: Gruppo volontari      # facoltativo
+```
+
+### Attrezzi
+
+I nomi degli attrezzi vengono da un elenco fisso, così lo stesso attrezzo si scrive sempre
+allo stesso modo e più avanti si può chiedere al sito quali sentieri richiedono la motosega.
+Se sbagli un nome, la build si ferma e ti elenca quelli accettati.
+
+| Identificatore | Attrezzo |
+| --- | --- |
+| `decespugliatore` | Decespugliatore |
+| `motosega` | Motosega |
+| `sega-a-mano` | Sega a mano |
+| `roncola` | Roncola |
+| `cesoie` | Cesoie |
+| `vanga` | Vanga |
+| `zappa` | Zappa |
+| `rastrello` | Rastrello |
+| `badile` | Badile |
+| `carriola` | Carriola |
+| `vernice-segnaletica` | Vernice per segnavia |
+| `attrezzi-da-falegname` | Attrezzi da falegname |
+
+Se ti serve qualcosa che non è in elenco, descrivilo in `notes`. Se è un attrezzo che
+capita spesso, conviene aggiungerlo all'elenco invece di ripeterlo nelle note.
+
+### Tempo stimato
+
+`effort_person_hours` è il lavoro totale in **ore-persona**, non il tempo che ci si mette.
+Otto ore-persona sono due ore in quattro, o otto ore da soli. Si scrive così perché "tre
+ore" non dice niente senza sapere in quanti.
+
+`min_people` è un'altra cosa: quante persone servono contemporaneamente perché il lavoro si
+possa fare. Con la motosega non si va da soli, a prescindere da quanto ci vuole.
+
+### Condizione e sua data
+
+`condition` descrive quanto il sentiero è invaso. Quando lo indichi devi indicare anche
+`condition_checked_on`, la data in cui l'hai constatato: una valutazione senza data non vale
+niente. Puoi indicare la data da sola, se hai controllato e non c'era nulla da segnalare.
+
+La scheda non presenta mai una valutazione come attuale quando non lo è. Dopo dodici mesi
+dice che va riverificata. Se nel frattempo è stato registrato un intervento successivo alla
+valutazione, dice che la valutazione è precedente all'intervento e non descrive più il
+sentiero.
+
+### Registrare un intervento
+
+Dopo una giornata di lavoro, aggiungi una voce in fondo a `interventions` con la data e una
+riga su cosa è stato fatto. Il resto è facoltativo. L'elenco non deve essere completo:
+niente nel sito dipende dal fatto che lo sia, e un intervento non registrato lascia solo la
+condizione senza il suo aggiornamento.
+
+Un intervento non può avere una data futura, e la descrizione sta in 300 caratteri.
+
 ## Licenza
 
 Il codice del sito è sotto licenza MIT ([LICENSE](LICENSE)). I dati del

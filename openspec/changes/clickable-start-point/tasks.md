@@ -2,8 +2,8 @@
 
 ## 1. Resolve the start point
 
-- [ ] 1.1 Add a pure helper (for example `resolveStartPoint` in `src/components/startPoint.ts`) taking the entry's `start` metadata and the track points and returning `{ lat, lon, source: 'metadata' | 'track' }`, or null when the track is empty and the metadata has no coordinates; verify with Vitest that metadata wins over the track, that the track's first point is used when metadata has none, and that the null case is reachable
-- [ ] 1.2 Add a formatter for the displayed pair, four decimals with the Italian decimal comma, reusing `src/components/format.ts`; verify with a test that 46.16115 renders as `46,1612` and that latitude and longitude are separate strings
+- [x] 1.1 Add a pure helper (for example `resolveStartPoint` in `src/components/startPoint.ts`) taking the entry's `start` metadata and the track points and returning `{ lat, lon, source: 'metadata' | 'track' }`, or null when the track is empty and the metadata has no coordinates; verify with Vitest that metadata wins over the track, that the track's first point is used when metadata has none, and that the null case is reachable
+- [x] 1.2 Add a formatter for the displayed pair, four decimals with the Italian decimal comma, reusing `src/components/format.ts`; verify with a test that 46.16115 renders as `46,1612` and that latitude and longitude are separate strings
 
 ## 2. The control on the detail page
 

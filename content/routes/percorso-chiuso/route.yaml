@@ -7,3 +7,19 @@ start:
   name: Piateda, ponte sull'Adda
 status: closed
 
+# Maintenance fixture: assessment predates the last intervention -> state "superseded".
+# The entry is closed, so it also covers "closed entries are absent from the overview".
+maintenance:
+  condition: invaso
+  condition_checked_on: 2026-04-15
+  tools: [motosega, badile, carriola]
+  effort_person_hours: 40
+  min_people: 4
+  notes: Frana sul primo terzo; serve rimuovere materiale prima di riaprire.
+  interventions:
+    - date: 2026-06-20
+      summary: Rimosso il materiale più grosso, sentiero ancora chiuso.
+      people: 6
+      person_hours: 24
+      tools: [badile, carriola]
+      by: Gruppo volontari Piateda

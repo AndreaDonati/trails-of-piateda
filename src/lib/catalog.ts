@@ -11,6 +11,8 @@
  * - readTrackBytes(entry)         – the original track.gpx bytes, for the download endpoint
  * - getPhotos(entry)              – derived photos of an entry, sorted along the track, with the
  *                                   URLs of the display and thumbnail images (memoised, see photos.ts)
+ * - getMaintenance(entry, today?) – the entry's maintenance block, its interventions newest first,
+ *                                   the date of the most recent one and the state of its condition
  * - getOverview()                 – FeatureCollection of the entries with status open/maintenance,
  *                                   simplified geometry, properties listed in OverviewProperties
  * - entryUrl(kind, slug, base?)   – page URL: <base>/sentieri/<slug>/ or <base>/percorsi/<slug>/
@@ -25,6 +27,7 @@ import { join } from 'node:path';
 import type { CollectionEntry } from 'astro:content';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 import { loadTrack, type Track } from './gpx';
+import { assessmentState, BUILD_DATE, type AssessmentState, type MaintenanceRow } from './maintenance';
 import { loadPhotos, type DerivedPhoto } from './photos';
 
 export type Kind = 'trail' | 'route';
@@ -151,6 +154,61 @@ export function getPhotos(entry: CatalogEntry): Promise<DerivedPhoto[]> {
     cover: entry.data.cover,
     points: getTrack(entry).points,
   });
+}
+
+/** The validated `maintenance` block of an entry. */
+export type MaintenanceData = NonNullable<TrailData['maintenance']>;
+export type Intervention = NonNullable<MaintenanceData['interventions']>[number];
+
+export interface EntryMaintenance {
+  /** The block as written, or null when the entry declares none. */
+  data: MaintenanceData | null;
+  /** The recorded interventions, most recent first; empty when none is recorded. */
+  interventions: readonly Intervention[];
+  /** Date of the most recent recorded intervention, YYYY-MM-DD; null when none is recorded. */
+  lastInterventionOn: string | null;
+  /** How the recorded condition must be presented (see assessmentState in maintenance.ts). */
+  state: AssessmentState;
+  /** What the overview comparator and the effort total need from this entry. */
+  row: MaintenanceRow;
+}
+
+/**
+ * Everything the detail page and the maintenance overview need about one entry's maintenance,
+ * derived in one place so the two pages cannot disagree — in particular about which
+ * intervention is the most recent, which is not the last one in the file: the list is written
+ * by hand and nothing forces it into order.
+ *
+ * Pure and cheap (a sort of a handful of records), so it is not memoised; call it once per
+ * entry per page and pass the result down.
+ *
+ * `today` is the reference for the staleness rule and defaults to the build date.
+ */
+export function getMaintenance(entry: CatalogEntry, today: string = BUILD_DATE): EntryMaintenance {
+  const data = entry.data.maintenance ?? null;
+  const interventions = [...(data?.interventions ?? [])].sort((a, b) => b.date.localeCompare(a.date));
+  const lastInterventionOn = interventions[0]?.date ?? null;
+
+  return {
+    data,
+    interventions,
+    lastInterventionOn,
+    state: assessmentState(
+      {
+        checkedOn: data?.condition_checked_on,
+        condition: data?.condition,
+        lastInterventionOn: lastInterventionOn ?? undefined,
+      },
+      today,
+    ),
+    row: {
+      id: entry.slug,
+      hasMaintenance: data !== null,
+      condition: data?.condition,
+      checkedOn: data?.condition_checked_on,
+      effortPersonHours: data?.effort_person_hours,
+    },
+  };
 }
 
 export interface OverviewProperties {

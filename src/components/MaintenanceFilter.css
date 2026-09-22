@@ -1,0 +1,84 @@
+/*
+ * Styles of the tool-filter island. React components cannot use Astro scoped styles, so this
+ * file is imported by MaintenanceFilter.tsx; like every other stylesheet it may only use the
+ * custom properties declared in tokens.css.
+ *
+ * Mobile: one horizontal, scrollable chip row, so the list stays close to the top on a 360 px
+ * screen. From 768 px the chips wrap instead.
+ */
+
+.tool-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.tool-filter__group {
+  /* Shrinks but does not grow, so "Mostra tutti" stays beside the chips instead of being
+     pushed to the far edge of a wide screen. */
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tool-filter__group legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.tool-filter__chips {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.tool-filter__chip {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.tool-filter__chip:hover {
+  border-color: var(--color-primary);
+}
+
+.tool-filter__chip[aria-pressed='true'] {
+  border-color: var(--color-primary-strong);
+  background: var(--color-primary-strong);
+  color: var(--color-on-primary);
+}
+
+.tool-filter__reset {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.tool-filter__reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (min-width: 768px) {
+  .tool-filter__chips {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}

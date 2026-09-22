@@ -1,0 +1,359 @@
+---
+/**
+ * Maintenance overview (tasks 5.1 to 5.3, design D8): every entry that is not closed, seen
+ * from the point of view of whoever has to clear it.
+ *
+ * Like the list page, the server renders every row and the island only toggles the `hidden`
+ * attribute of the <li> elements it finds by id (see src/components/maintenanceFilters.ts), so
+ * the whole page is readable before hydration and with JavaScript off. The row count, the
+ * effort total and the "nessun risultato" block are server-rendered for the same reason.
+ *
+ * The order comes from `compareByAttention`, applied to the row that `getMaintenance` builds:
+ * the comparator is never fed a hand-made object, so this page and the detail pages cannot
+ * disagree about what an entry declares.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import MaintenanceFilter from '../components/MaintenanceFilter';
+import {
+  ASSESSMENT_STATE_LABELS,
+  COUNT_ID,
+  EMPTY_STATE_ID,
+  formatPersonHours,
+  formatRowCount,
+  GROUP_WITH_ID,
+  GROUP_WITHOUT_ID,
+  rowElementId,
+  TOTAL_ID,
+  type MaintenanceListItem,
+} from '../components/maintenanceFilters';
+import { formatDate, kindLabel } from '../components/format';
+import { getEntries, getMaintenance } from '../lib/catalog';
+import {
+  compareByAttention,
+  CONDITION_LABELS,
+  sumEffortPersonHours,
+  TOOL_LABELS,
+  type AssessmentState,
+} from '../lib/maintenance';
+import { SITE_NAME } from '../lib/site';
+
+interface Row {
+  item: MaintenanceListItem;
+  name: string;
+  url: string;
+  kind: string;
+  /** null when no level is recorded, whatever the reason. */
+  conditionLabel: string | null;
+  state: AssessmentState;
+  /** Date of the assessment, already formatted; null when the entry was never checked. */
+  checkedOn: string | null;
+  minPeople: number | null;
+  lastInterventionOn: string | null;
+}
+
+const rows: Row[] = (await getEntries())
+  // A closed entry is not work waiting to be done: it is closed (spec "Closed entry").
+  .filter((entry) => entry.data.status !== 'closed')
+  .map((entry) => {
+    const { data, lastInterventionOn, state, row } = getMaintenance(entry);
+    return {
+      // Kept beside the view model only to sort: the comparator must see the row that
+      // getMaintenance built, never one assembled here.
+      row,
+      view: {
+        item: {
+          id: entry.slug,
+          hasMaintenance: row.hasMaintenance,
+          tools: data?.tools ?? [],
+          effortPersonHours: row.effortPersonHours,
+        },
+        name: entry.data.name,
+        url: entry.url,
+        kind: kindLabel(entry.kind),
+        conditionLabel: data?.condition ? CONDITION_LABELS[data.condition] : null,
+        state,
+        checkedOn: data?.condition_checked_on ? formatDate(data.condition_checked_on) : null,
+        minPeople: data?.min_people ?? null,
+        lastInterventionOn: lastInterventionOn ? formatDate(lastInterventionOn) : null,
+      } satisfies Row,
+    };
+  })
+  .sort((a, b) => compareByAttention(a.row, b.row))
+  .map((sorted) => sorted.view);
+
+const documented = rows.filter((row) => row.item.hasMaintenance);
+const undocumented = rows.filter((row) => !row.item.hasMaintenance);
+const items: MaintenanceListItem[] = rows.map((row) => row.item);
+
+const description =
+  'Stato dei sentieri e dei percorsi dal punto di vista di chi li tiene puliti: condizione rilevata, attrezzi, lavoro stimato e ultimo intervento registrato.';
+---
+
+<BaseLayout title={`${SITE_NAME} · manutenzione`} description={description}>
+  <div class="manutenzione container">
+    <header class="manutenzione__intro">
+      <h1>Manutenzione</h1>
+      <p>
+        Questa pagina è per chi tiene puliti i sentieri, non per chi li percorre. Per ogni voce del catalogo
+        riporta la condizione registrata con la data del rilievo, gli attrezzi che servono, il lavoro stimato
+        in ore-persona, il numero minimo di persone e la data dell'ultimo intervento registrato. Le voci
+        chiuse non compaiono.
+      </p>
+      <p class="manutenzione__caveat">
+        Le informazioni arrivano dalle schede del catalogo e sono compilate a mano: una voce senza
+        informazioni non è una voce a posto, è una voce che nessuno ha ancora guardato.
+      </p>
+    </header>
+
+    <div class="manutenzione__filter">
+      <MaintenanceFilter client:load items={items} />
+    </div>
+
+    <p class="manutenzione__summary">
+      <span id={COUNT_ID}>{formatRowCount(rows.length)}</span> · lavoro stimato{' '}
+      <strong id={TOTAL_ID}>{formatPersonHours(sumEffortPersonHours(items))}</strong>
+      <span class="manutenzione__summary-note">
+        Somma delle sole stime dichiarate: le voci che non ne hanno non sono conteggiate.
+      </span>
+    </p>
+
+    {
+      rows.length === 0 && (
+        <p class="manutenzione__empty-catalog">Il catalogo non contiene ancora voci aperte.</p>
+      )
+    }
+
+    <section class="manutenzione__group" id={GROUP_WITH_ID} hidden={documented.length === 0}>
+      <h2>Voci con informazioni di manutenzione</h2>
+      <p class="manutenzione__group-note">
+        In ordine di attenzione richiesta: prima le condizioni peggiori, a parità di condizione prima il
+        rilievo più vecchio.
+      </p>
+      <ul class="manutenzione__list">
+        {
+          documented.map((row) => (
+            <li class="manutenzione__row" id={rowElementId(row.item.id)}>
+              <h3 class="manutenzione__name">
+                <a href={row.url}>{row.name}</a>
+              </h3>
+              <p class="manutenzione__kind">{row.kind}</p>
+              <dl class="manutenzione__facts">
+                <div class="manutenzione__fact">
+                  <dt>Condizione</dt>
+                  <dd>
+                    {row.conditionLabel ?? 'Non registrata'}
+                    <span class:list={['manutenzione__state', `manutenzione__state--${row.state}`]}>
+                      {ASSESSMENT_STATE_LABELS[row.state]}
+                    </span>
+                    {row.checkedOn && <span class="manutenzione__when">rilevata il {row.checkedOn}</span>}
+                  </dd>
+                </div>
+
+                {row.item.tools.length > 0 && (
+                  <div class="manutenzione__fact">
+                    <dt>Attrezzi</dt>
+                    <dd>{row.item.tools.map((tool) => TOOL_LABELS[tool]).join(', ')}</dd>
+                  </div>
+                )}
+
+                {row.item.effortPersonHours !== undefined && (
+                  <div class="manutenzione__fact">
+                    <dt>Lavoro stimato</dt>
+                    <dd>{formatPersonHours(row.item.effortPersonHours)}</dd>
+                  </div>
+                )}
+
+                {row.minPeople !== null && (
+                  <div class="manutenzione__fact">
+                    <dt>Persone minime</dt>
+                    <dd>{row.minPeople}</dd>
+                  </div>
+                )}
+
+                {row.lastInterventionOn && (
+                  <div class="manutenzione__fact">
+                    <dt>Ultimo intervento</dt>
+                    <dd>{row.lastInterventionOn}</dd>
+                  </div>
+                )}
+              </dl>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="manutenzione__group" id={GROUP_WITHOUT_ID} hidden={undocumented.length === 0}>
+      <h2>Voci senza informazioni di manutenzione</h2>
+      <p class="manutenzione__group-note">
+        Nessuno ha ancora registrato attrezzi, lavoro o condizione per queste voci. Non vuol dire che non
+        serva nulla.
+      </p>
+      <ul class="manutenzione__list">
+        {
+          undocumented.map((row) => (
+            <li class="manutenzione__row manutenzione__row--bare" id={rowElementId(row.item.id)}>
+              <h3 class="manutenzione__name">
+                <a href={row.url}>{row.name}</a>
+              </h3>
+              <p class="manutenzione__kind">{row.kind}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <p class="manutenzione__empty" id={EMPTY_STATE_ID} hidden>Nessuna voce richiede l'attrezzo selezionato.</p>
+  </div>
+</BaseLayout>
+
+<style>
+  .manutenzione {
+    padding-block: var(--space-5);
+  }
+
+  .manutenzione__intro p {
+    max-width: 60ch;
+    margin-top: var(--space-2);
+    color: var(--color-text-muted);
+  }
+
+  .manutenzione__caveat {
+    font-size: var(--font-size-sm);
+  }
+
+  .manutenzione__filter {
+    margin-top: var(--space-5);
+  }
+
+  .manutenzione__summary {
+    margin-top: var(--space-4);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .manutenzione__summary strong {
+    color: var(--color-text);
+  }
+
+  .manutenzione__summary-note {
+    display: block;
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+  }
+
+  .manutenzione__group {
+    margin-top: var(--space-6);
+  }
+
+  .manutenzione__group h2 {
+    font-size: var(--font-size-xl);
+  }
+
+  .manutenzione__group-note {
+    max-width: 60ch;
+    margin-top: var(--space-1);
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-sm);
+  }
+
+  .manutenzione__list {
+    display: grid;
+    gap: var(--space-3);
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .manutenzione__row {
+    min-width: 0;
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .manutenzione__row--bare {
+    background: var(--color-surface-alt);
+  }
+
+  .manutenzione__name {
+    font-size: var(--font-size-lg);
+    /* Long trail names must break rather than widen the card on a 360 px screen. */
+    overflow-wrap: anywhere;
+  }
+
+  .manutenzione__kind {
+    margin-top: var(--space-1);
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .manutenzione__facts {
+    display: grid;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 0;
+  }
+
+  .manutenzione__fact {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .manutenzione__fact dt {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .manutenzione__fact dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .manutenzione__state {
+    display: inline-block;
+    margin-left: var(--space-2);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-full);
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+  }
+
+  /* The two states that say the recorded level no longer describes the trail are the reason
+     the state is printed at all, so they are the only ones marked. */
+  .manutenzione__state--needs-check,
+  .manutenzione__state--superseded {
+    background: var(--color-status-warning-bg);
+    color: var(--color-text);
+  }
+
+  .manutenzione__when {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  .manutenzione__empty,
+  .manutenzione__empty-catalog {
+    margin-top: var(--space-5);
+    padding: var(--space-5);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    text-align: center;
+  }
+
+  @media (min-width: 768px) {
+    .manutenzione__facts {
+      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      gap: var(--space-3);
+    }
+  }
+</style>

@@ -36,3 +36,21 @@ photos:
     caption: I tornanti sopra la Val Venina.
     author: Fixture
 
+# Maintenance fixture: assessment newer than every recorded intervention -> state "current".
+maintenance:
+  condition: buono
+  condition_checked_on: 2026-07-10
+  tools: [decespugliatore, roncola]
+  effort_person_hours: 8
+  min_people: 2
+  notes: Il tratto sopra i tornanti si richiude in fretta dopo le piogge di giugno.
+  interventions:
+    - date: 2026-06-20
+      summary: Sfoltita la vegetazione sui tornanti e ripristinati due segnavia.
+      people: 4
+      person_hours: 10
+      tools: [decespugliatore, vernice-segnaletica]
+      by: Gruppo volontari Piateda
+    - date: 2025-07-05
+      summary: Taglio di un albero caduto a metà salita.
+      tools: [motosega]

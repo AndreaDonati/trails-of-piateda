@@ -12,3 +12,10 @@ trails: [piateda-ambria]
 duration_minutes: 240
 verified_on: "2025-05-10"
 
+# Maintenance fixture: assessment older than CONDITION_STALE_AFTER_MONTHS -> state "needs-check".
+maintenance:
+  condition: da_sfoltire
+  condition_checked_on: 2024-09-01
+  tools: [decespugliatore, cesoie]
+  effort_person_hours: 12
+  min_people: 3

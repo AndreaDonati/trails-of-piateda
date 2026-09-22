@@ -13,12 +13,13 @@ import TrackMap from './map/TrackMap';
 import ElevationProfile from './ElevationProfile.astro';
 import PhotoGallery from './PhotoGallery.astro';
 import StatsBar from './StatsBar.astro';
+import MaintenancePanel from './MaintenancePanel.astro';
 import ReportAction from './report/ReportAction.astro';
 import ReportPanel from './report/ReportPanel.astro';
 import { toGalleryPhoto, toPhotoMarkers } from './gallery';
 import { resolveStartPoint } from './startPoint';
 import { formatCoordinates } from './format';
-import { getPhotos, getTrack, KIND_PATH, type CatalogEntry } from '../lib/catalog';
+import { getMaintenance, getPhotos, getTrack, KIND_PATH, type CatalogEntry } from '../lib/catalog';
 import { SITE_NAME, withBase } from '../lib/site';
 import { readReportFormConfig, REPORT_PANEL_ID } from '../lib/reportForm';
 import { renderMarkdown } from './markdown';
@@ -250,6 +251,10 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
             }
           </dl>
         </section>
+
+        {/* Last of the sections: it addresses the volunteers who maintain the trail,
+            not the hiker reading everything above it (design D6). */}
+        <MaintenancePanel maintenance={getMaintenance(entry)} />
 
         {report && <ReportPanel id={REPORT_PANEL_ID} config={report.config} target={report.target} />}
       </div>
