@@ -16,6 +16,8 @@ import StatsBar from './StatsBar.astro';
 import ReportAction from './report/ReportAction.astro';
 import ReportPanel from './report/ReportPanel.astro';
 import { toGalleryPhoto, toPhotoMarkers } from './gallery';
+import { resolveStartPoint } from './startPoint';
+import { formatCoordinates } from './format';
 import { getPhotos, getTrack, KIND_PATH, type CatalogEntry } from '../lib/catalog';
 import { SITE_NAME, withBase } from '../lib/site';
 import { readReportFormConfig, REPORT_PANEL_ID } from '../lib/reportForm';
@@ -43,7 +45,15 @@ const dataUrl = withBase(`/data/${KIND_PATH[kind]}/${slug}.geojson`);
 // Problem report (design D11): null unless the three PUBLIC_REPORT_FORM_* variables are set,
 // and then nothing about reporting is rendered. The form receives an absolute URL because the
 // owner opens it from a spreadsheet, where a site-relative path means nothing.
+// The one start point of this entry: the declared coordinates when the metadata has them,
+// the track's first recorded point otherwise. The printed text, the button's payload and the
+// marker on the map all come from here, so the three cannot disagree (design D1).
+const resolvedStart = resolveStartPoint(data.start, track.points);
+const startCoordinates = resolvedStart ? formatCoordinates(resolvedStart.lat, resolvedStart.lon) : null;
+
 const reportConfig = readReportFormConfig();
+// Deliberately the track's first point and not `resolvedStart`: the report spec fixes this
+// fallback as the recorded start of the track.
 const startPoint = track.points[0];
 const report =
   reportConfig && startPoint
@@ -103,6 +113,7 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
             height="100%"
             photos={toPhotoMarkers(photos)}
             reportPicking={report !== null}
+            startPoint={resolvedStart ? { lat: resolvedStart.lat, lon: resolvedStart.lon } : undefined}
           />
           <button class="entry__fullscreen" type="button" hidden>Schermo intero</button>
         </div>
@@ -154,7 +165,30 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
           <dl class="entry__meta">
             <div>
               <dt>Partenza</dt>
-              <dd>{data.start.name}</dd>
+              <dd>
+                {data.start.name}
+                {
+                  startCoordinates && (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        class="entry__start-coords"
+                        id="coordinate-partenza"
+                        data-lat={resolvedStart!.lat}
+                        data-lon={resolvedStart!.lon}
+                        aria-describedby="coordinate-partenza-aiuto"
+                        hidden
+                      >
+                        {startCoordinates.lat} N, {startCoordinates.lon} E
+                      </button>
+                      <span id="coordinate-partenza-aiuto" class="visually-hidden">
+                        Mostra il punto di partenza sulla mappa della scheda
+                      </span>
+                    </>
+                  )
+                }
+              </dd>
             </div>
             <div>
               <dt>Comuni</dt>
@@ -224,6 +258,29 @@ const isUrl = (source: string) => /^https?:\/\//.test(source);
 </BaseLayout>
 
 <script>
+  import { startFocusEvent } from './startPoint';
+
+  // The start coordinates ship hidden and are revealed only once the map island has
+  // announced itself, so a browser without WebGL never shows a control that cannot work.
+  const coords = document.querySelector<HTMLButtonElement>('#coordinate-partenza');
+  if (coords) {
+    document.addEventListener(
+      'map:ready',
+      (event) => {
+        if (event.detail.mode !== 'detail') return;
+        coords.hidden = false;
+      },
+      { once: true },
+    );
+    coords.addEventListener('click', () => {
+      const lat = Number(coords.dataset.lat);
+      const lon = Number(coords.dataset.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        document.dispatchEvent(startFocusEvent({ lat, lon }));
+      }
+    });
+  }
+
   // Fullscreen toggle for the map box. The button ships hidden and is revealed only where
   // the Fullscreen API exists, so no page ever shows a control that does nothing.
   const box = document.getElementById('mappa-scheda');

@@ -12,6 +12,9 @@ export const NOT_AVAILABLE = 'non disponibile';
 
 const km1 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const metres0 = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 });
+// Four decimals, about 10 m: the precision the report form already sends (COORDINATE_DECIMALS
+// in src/lib/reportForm.ts) and honest about what a GPS trace is worth.
+const degrees4 = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const longDate = new Intl.DateTimeFormat('it-IT', {
   day: 'numeric',
   month: 'long',
@@ -44,6 +47,23 @@ export function formatDuration(minutes: number | null | undefined): string | nul
 export function formatDate(iso: string): string {
   const date = new Date(`${iso}T00:00:00Z`);
   return Number.isNaN(date.getTime()) ? iso : longDate.format(date);
+}
+
+/** Latitude and longitude of the start point, formatted separately (design D4). */
+export interface FormattedCoordinates {
+  lat: string;
+  lon: string;
+}
+
+/**
+ * Decimal degrees with four decimals and the Italian decimal comma: 46.16115 → "46,1612".
+ *
+ * The two numbers are returned apart, never joined here: read as one string a screen reader
+ * runs them together into a single number, so the page has to put a label or a separator
+ * between them.
+ */
+export function formatCoordinates(lat: number, lon: number): FormattedCoordinates {
+  return { lat: degrees4.format(lat), lon: degrees4.format(lon) };
 }
 
 export function kindLabel(kind: TrackKind): string {

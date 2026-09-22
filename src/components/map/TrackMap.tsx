@@ -26,7 +26,7 @@ import {
   type MapMouseEvent,
   type StyleSpecification,
 } from 'maplibre-gl';
-import type { FeatureCollection, Position } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 import { setWorkerUrl } from 'maplibre-gl';
 // MapLibre resolves its worker as `new URL('./maplibre-gl-worker.mjs', import.meta.url)`
 // relative to its own module. Astro bundles the library into a hashed chunk and emits no
@@ -61,6 +61,7 @@ import {
   type Difficulty,
 } from '../../lib/mapConfig';
 import { PHOTO_SELECT_EVENT, photoSelectEvent, type PhotoMarker, type PhotoSelectDetail } from '../gallery';
+import { START_FOCUS_EVENT, type StartFocusDetail } from '../startPoint';
 import type { ReportPickDetail, ReportPointDetail } from '../../lib/reportForm';
 import { isWebGLAvailable } from './webgl';
 import {
@@ -85,6 +86,8 @@ import {
   collectionBounds,
   isLineFeature,
   isPointFeature,
+  startMarkerPosition,
+  toLngLat,
   trackEndpoints,
   type TrackProperties,
 } from './geometry';
@@ -120,6 +123,17 @@ export interface TrackMapProps {
    * and the page already decides whether the report action exists at all.
    */
   reportPicking?: boolean;
+  /**
+   * Start point resolved by the page (`resolveStartPoint`, src/components/startPoint.ts): the
+   * coordinates declared in the entry metadata, or the track's first point. The start marker
+   * is placed here and `start:focus` centres on it. Without the prop the marker falls back to
+   * `trackEndpoints()`, exactly as before.
+   *
+   * Unlike `photos`, the object's identity does not have to be stable: only `lat` and `lon`
+   * reach the map effect, as primitives (see the dependency array), so an inline literal is
+   * safe and only a real change of coordinates rebuilds the map.
+   */
+  startPoint?: { lat: number; lon: number };
 }
 
 /** Payload of the `map:ready` event dispatched on `document` once layers are added. */
@@ -133,6 +147,8 @@ export interface TrackMapReadyDetail {
 declare global {
   interface DocumentEventMap {
     'map:ready': CustomEvent<TrackMapReadyDetail>;
+    /** Page → island only (design D2); the island sends nothing back. */
+    [START_FOCUS_EVENT]: CustomEvent<StartFocusDetail>;
   }
 }
 
@@ -185,10 +201,6 @@ function buildStyle(): StyleSpecification {
       },
     ],
   };
-}
-
-function toLngLat(position: Position): [number, number] {
-  return [position[0] ?? 0, position[1] ?? 0];
 }
 
 // --- Degradation (task 5.3) -------------------------------------------------------------
@@ -371,13 +383,30 @@ function createMarkerElement(kind: 'start' | 'end' | 'waypoint', label: string):
   return el;
 }
 
-function addDetailMarkers(map: MapLibreMap, data: FeatureCollection, sink: Marker[]): void {
+/**
+ * Start marker, end marker and waypoints. Returns the start marker, which `attachStartFocus`
+ * needs, or null when there is no position for one.
+ *
+ * `startPosition` is the point the page resolved: it wins over the track's first recorded
+ * point (spec `interactive-map`, "Declared start differs from the recorded track"), because a
+ * trailhead legitimately sits a few hundred metres from where the recording began. The end
+ * marker and the waypoints stay on the track either way.
+ */
+function addDetailMarkers(
+  map: MapLibreMap,
+  data: FeatureCollection,
+  sink: Marker[],
+  startPosition: [number, number] | null,
+): Marker | null {
   const ends = trackEndpoints(data.features.filter(isLineFeature));
+  const start = startMarkerPosition(startPosition, ends);
+  let startMarker: Marker | null = null;
+  if (start) {
+    startMarker = new Marker({ element: createMarkerElement('start', 'Partenza') }).setLngLat(start).addTo(map);
+    sink.push(startMarker);
+  }
   if (ends) {
     sink.push(
-      new Marker({ element: createMarkerElement('start', 'Partenza') })
-        .setLngLat(toLngLat(ends.start))
-        .addTo(map),
       new Marker({ element: createMarkerElement('end', 'Arrivo') })
         .setLngLat(toLngLat(ends.end))
         .addTo(map),
@@ -391,6 +420,74 @@ function addDetailMarkers(map: MapLibreMap, data: FeatureCollection, sink: Marke
         .addTo(map),
     );
   }
+  return startMarker;
+}
+
+// --- Start focus (design D2) -------------------------------------------------------------
+
+/** Zoom floor when focusing the start: close enough to read a car park off the base map. */
+const START_FOCUS_ZOOM = 15;
+const START_FOCUS_DURATION_MS = 600;
+/** How long the highlight stays on when nothing interrupts it. */
+const START_HIGHLIGHT_MS = 4000;
+const START_HIGHLIGHT_CLASS = 'track-marker--focused';
+
+/**
+ * Answer `start:focus` from the detail page: centre on the start marker and highlight it.
+ *
+ * The camera goes to the marker's own position, not to the coordinates in the event, so the
+ * map always moves to the thing it then highlights; by design D1 the two are the same point.
+ * The current zoom is a floor, so pressing the control on an already zoomed-in map does not
+ * pull the visitor back out, and pitch and bearing are untouched so a tilted view stays tilted.
+ *
+ * The highlight clears on a timer and on the visitor's next interaction. `originalEvent` tells
+ * a gesture from a camera call: the `easeTo` below fires `movestart` without one, so the focus
+ * does not cancel itself, while a drag and the zoom buttons of the navigation control do carry
+ * one. `wheel` and `touchstart` are listened to separately because a scroll zoom applies its
+ * camera change from the render loop and its `movestart` arrives with no `originalEvent`,
+ * which would leave the highlight on through a zoom (spec `interactive-map`, "Highlight is
+ * temporary").
+ *
+ * Returns the listener teardown.
+ */
+function attachStartFocus(map: MapLibreMap, marker: Marker): () => void {
+  const element = marker.getElement();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearHighlight = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    element.classList.remove(START_HIGHLIGHT_CLASS);
+  };
+
+  const onFocus = () => {
+    const { lng, lat } = marker.getLngLat();
+    clearHighlight();
+    element.classList.add(START_HIGHLIGHT_CLASS);
+    timer = setTimeout(clearHighlight, START_HIGHLIGHT_MS);
+    map.easeTo({
+      center: [lng, lat],
+      zoom: Math.max(map.getZoom(), START_FOCUS_ZOOM),
+      duration: START_FOCUS_DURATION_MS,
+    });
+  };
+
+  const onInteraction = (e: { originalEvent?: unknown }) => {
+    if (e.originalEvent) clearHighlight();
+  };
+
+  document.addEventListener(START_FOCUS_EVENT, onFocus);
+  map.on('movestart', onInteraction);
+  map.on('click', onInteraction);
+  map.on('wheel', onInteraction);
+  map.on('touchstart', onInteraction);
+
+  return () => {
+    document.removeEventListener(START_FOCUS_EVENT, onFocus);
+    clearHighlight();
+  };
 }
 
 // --- Photo markers (detail mode, task 6.5) -----------------------------------------------
@@ -558,7 +655,12 @@ export default function TrackMap({
   legend,
   photos = NO_PHOTOS,
   reportPicking = false,
+  startPoint,
 }: TrackMapProps) {
+  // Read as two primitives: what the effect depends on is the position, not the object that
+  // carried it, so a page passing a fresh literal on every render does not rebuild the map.
+  const startLat = startPoint?.lat;
+  const startLon = startPoint?.lon;
   const terrainEnabled = terrain ?? mode === 'overview';
   const showLegend = legend ?? mode === 'overview';
   const rootRef = useRef<HTMLDivElement>(null);
@@ -586,6 +688,9 @@ export default function TrackMap({
     const markers: Marker[] = [];
     let detachReportPicking: (() => void) | null = null;
     let detachPhotos: (() => void) | null = null;
+    let detachStartFocus: (() => void) | null = null;
+    const startPosition: [number, number] | null =
+      typeof startLat === 'number' && typeof startLon === 'number' ? [startLon, startLat] : null;
 
     const start = async () => {
       // Fetch before creating the map so the first tiles requested are the framed ones.
@@ -630,7 +735,12 @@ export default function TrackMap({
         if (terrainEnabled) created.setTerrain({ source: SOURCE_IDS.terrain, exaggeration });
         addTrackLayers(created, data, pointer);
         attachTrackInteraction(created, mode === 'overview' ? setSelected : undefined, pointer);
-        if (mode === 'detail') addDetailMarkers(created, data, markers);
+        if (mode === 'detail') {
+          const startMarker = addDetailMarkers(created, data, markers, startPosition);
+          // No marker, nothing to centre on or to highlight: the page's control would have
+          // nothing to point at, so no listener is installed either.
+          if (startMarker) detachStartFocus = attachStartFocus(created, startMarker);
+        }
         // Only where the page says the report form is configured: with no panel to talk to,
         // the listener and its marker would be behaviour reachable by a stray `report:pick`.
         if (mode === 'detail' && reportPicking) detachReportPicking = attachReportPicking(created);
@@ -650,14 +760,17 @@ export default function TrackMap({
       cancelled = true;
       detachReportPicking?.();
       detachPhotos?.();
+      detachStartFocus?.();
       markers.forEach((m) => m.remove());
       map?.remove();
     };
     // Everything here rebuilds the map from scratch, so the list must hold only values that
     // are stable across renders: the props are primitives except `photos`, whose identity the
-    // caller keeps (the default is the frozen NO_PHOTOS, not a fresh literal). `setSelected`
-    // and `setStatus` are React setters, stable by contract, and are deliberately not listed.
-  }, [dataUrl, mode, terrainEnabled, exaggeration, fit, photos, reportPicking]);
+    // caller keeps (the default is the frozen NO_PHOTOS, not a fresh literal). The `startPoint`
+    // object is deliberately absent and its two numbers are listed instead, so its identity
+    // cannot rebuild the map. `setSelected` and `setStatus` are React setters, stable by
+    // contract, and are deliberately not listed.
+  }, [dataUrl, mode, terrainEnabled, exaggeration, fit, photos, reportPicking, startLat, startLon]);
 
   /*
    * No effect resizes the map when the selection panel opens or closes. On desktop the panel

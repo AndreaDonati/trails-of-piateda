@@ -67,6 +67,13 @@ cover: cima.jpg
 Campi obbligatori: `name`, `summary` (massimo 200 caratteri), `difficulty`,
 `municipalities`, `start`.
 
+`start.lat` e `start.lon` sono facoltativi e vanno indicati insieme. Quando ci sono,
+spostano il segnaposto di partenza sulla mappa e vengono mostrati sulla scheda come
+coordinate cliccabili. Possono legittimamente non coincidere con il primo punto del GPX:
+la traccia di solito parte dove hai acceso il navigatore, mentre il punto utile a chi
+arriva è il parcheggio o la fermata dell'autobus. Se non li indichi, la scheda usa il
+primo punto della traccia.
+
 Nei percorsi (`route.yaml`) ci sono due campi in più, entrambi facoltativi:
 `loop: true` se è un anello, e `trails: [piateda-ambria, ...]` con gli
 identificatori dei sentieri che compone.

@@ -53,6 +53,24 @@ export function collectionBounds(fc: FeatureCollection): [number, number, number
   return Number.isFinite(west) ? [west, south, east, north] : null;
 }
 
+/** A GeoJSON position as the `[lng, lat]` pair MapLibre takes. */
+export function toLngLat(position: Position): [number, number] {
+  return [position[0] ?? 0, position[1] ?? 0];
+}
+
+/**
+ * Where the start marker goes: the point the page resolved when it gave one, the track's
+ * first recorded point otherwise (spec `interactive-map`, "Declared start differs from the
+ * recorded track"). Null only when there is neither.
+ */
+export function startMarkerPosition(
+  declared: [number, number] | null | undefined,
+  ends: { start: Position; end: Position } | null,
+): [number, number] | null {
+  if (declared) return declared;
+  return ends ? toLngLat(ends.start) : null;
+}
+
 /** First point of the first line and last point of the last line. */
 export function trackEndpoints(lines: LineFeature[]): { start: Position; end: Position } | null {
   const first = lines[0];

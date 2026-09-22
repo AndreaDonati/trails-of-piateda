@@ -4,8 +4,11 @@ summary: Salita da Piateda alla frazione di Ambria lungo la Val Venina.
 difficulty: E
 municipalities: [Piateda]
 start:
-  name: Piateda, piazza della chiesa
-  lat: 46.1612
+  # Deliberately about 200 m from the first point of track.gpx (46.1612, 9.9312): the
+  # walk begins at the church square, the car park is below it. This is the fixture for
+  # "declared start differs from the recorded track" in the interactive-map spec.
+  name: Piateda, parcheggio sotto la chiesa
+  lat: 46.1594
   lon: 9.9312
 signage: "CAI 305"
 duration_minutes: 150
@@ -32,3 +35,4 @@ photos:
   - file: tornanti-val-venina.jpg
     caption: I tornanti sopra la Val Venina.
     author: Fixture
+

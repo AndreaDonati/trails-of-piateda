@@ -301,6 +301,35 @@
   justify-content: center;
 }
 
+/* Start marker focused from the coordinates on the detail page (`start:focus`, design D2).
+   A ring, not a change of the marker itself, so the visitor still recognises the start
+   marker; the widening outline draws the eye to a marker that has just slid into view under
+   the easeTo. `outline-offset` is the only thing animated because MapLibre writes the
+   marker's position into its `transform`, which therefore cannot be touched here.
+   Kept apart from `--selected`, which the photo gallery owns: both can be lit at once. */
+.track-marker--focused {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  z-index: var(--z-panel);
+  animation: track-marker-focus-ring 900ms ease-out 2;
+}
+
+@keyframes track-marker-focus-ring {
+  from {
+    outline-offset: 2px;
+  }
+
+  to {
+    outline-offset: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track-marker--focused {
+    animation: none;
+  }
+}
+
 /* Report point marker (task 7.3): a single marker the visitor moves with a click, in the
    warning colour so it reads as "problem here" rather than as part of the track. */
 .track-marker--report {
