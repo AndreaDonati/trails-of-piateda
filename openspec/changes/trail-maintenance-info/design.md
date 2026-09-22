@@ -20,9 +20,9 @@ What the code does today, read before drafting:
 - Keep the whole concern removable in one piece.
 
 **Non-Goals:**
-- A cross-entry view for planning a work session. It is what organising a day actually needs, but it was not asked for and it is a page, not a field.
-- Any record of interventions carried out, which is a log and would need a write path the site does not have.
+- Recording an intervention from a phone after a work session. That needs a write path the site does not have; interventions arrive by pull request like everything else.
 - Restricting the information to volunteers. A static site with no accounts cannot.
+- Assigning work, scheduling dates, or notifying anyone.
 - Deriving difficulty of maintenance from anything automatic, such as the track's length or slope.
 
 ## Decisions
@@ -55,9 +55,11 @@ Why: the point of recording tools is to answer "which trails need the chainsaw" 
 
 The list starts from what clearing a mountain path in Valtellina actually takes and is meant to grow: adding an identifier is one line plus its label. Growing it is a change to this capability, which keeps the vocabulary reviewed rather than accumulating synonyms.
 
-### D5. Staleness computed at build time against a single threshold
+### D5. Staleness computed at build time, against a threshold and against the intervention log
 
-`CONDITION_STALE_AFTER_MONTHS = 12` lives with the vocabulary. The page compares `condition_checked_on` against the build date and renders one of three states: recent, stale, or checked with nothing recorded.
+`CONDITION_STALE_AFTER_MONTHS = 12` lives with the vocabulary. The page compares `condition_checked_on` against the build date and against the date of the most recent recorded intervention, and renders one of four states: current, needing a check, superseded by a later intervention, or checked with nothing recorded.
+
+The supersession rule is the more reliable half. Twelve months is a guess about vegetation; an intervention recorded after the assessment is a fact, and it says the recorded level describes a trail that no longer exists. Where both apply, supersession is reported, because it explains *why* the level is wrong rather than only that it is old.
 
 Why twelve months: vegetation closes a path over one or two growing seasons, so an assessment from the previous year is a hint and not a fact. The number is a guess and is written as one, in a single constant.
 
@@ -69,14 +71,36 @@ A section of its own after the hiking content, headed so that a hiker knows it i
 
 Why not in the existing `<dl>` of hiking facts: mixing "minimum two people" with "duration 2 h 30" invites a hiker to read the maintenance effort as walking time.
 
+### D7. Interventions live inside the maintenance block
+
+`maintenance.interventions` is a list in the entry's metadata file, newest entries appended, each with a date and a summary and optional people, person-hours, tools and author.
+
+Why inside the entry rather than one file per intervention: the catalog layout check expects exactly a metadata file, a track and an optional photos directory, and adding a fourth shape would change a rule every contributor has already learned. A trail is cleared once or twice a year, so ten years of history is twenty short records in a file that is reviewed in the same pull request as the trail it belongs to.
+
+Why inside `maintenance` rather than at the top level of the metadata: the whole concern stays removable in one piece, as decision D1 requires.
+
+The cost is honest and worth stating: this is a log in a file edited by hand, so it will be incomplete. Nothing depends on it being complete. A missing intervention means the condition is not marked superseded, which is the same state as before this change.
+
+### D8. The overview page is the trail list with a different lens
+
+`/manutenzione/` is server-rendered from the same collections as the trail list, with one React island for the tool filter, reusing the pattern of `FilterPanel`: the server renders every row and the island toggles `hidden` on rows it looks up by id, so the page is complete before hydration and with JavaScript off.
+
+The ordering is computed at build time from a single comparator: entries with maintenance information first, sorted by condition from `invaso` to `buono` and then by the age of the assessment, then entries without information in a labelled group. Putting entries with no information last and naming the group is deliberate: sorting them among the `buono` entries would read as "nothing to do here", when what is true is that nobody has looked.
+
+The running total of estimated effort recalculates with the filter, since its purpose is sizing a session for the tools you actually have.
+
+Alternative discarded: adding a maintenance column to the existing trail list and a filter beside the others. It mixes two audiences on one page, and the hiker's list is already dense; the ordering that makes the maintenance view useful is also the wrong one for someone choosing a walk.
+
 ## Risks / Trade-offs
 
-- [The condition level goes stale and misleads anyway] → The date is always shown, and past twelve months the page says it needs checking. If it still proves useless, removing it is one requirement and one field, which is the reason for D1.
+- [The condition level goes stale and misleads anyway] → The date is always shown, past twelve months the page says it needs checking, and an intervention recorded after the assessment marks it superseded. If it still proves useless, removing it is one requirement and one field, which is the reason for D1.
+- [The intervention log is filled for a while and then abandoned] → Likely, and it degrades gracefully: an entry with no interventions behaves exactly as it does without the feature. The failure mode to avoid is a page that implies completeness, so the overview shows the date of the last recorded intervention and never a count of work done or a claim that a trail is up to date.
+- [The overview page is ordered by a condition field nobody fills] → Then every entry lands in the "no information" group, which is an accurate picture and a visible prompt, not a broken page.
 - [The vocabulary does not fit how the volunteers speak] → It is a guess made without them. The first real entries will show it; adding or renaming identifiers is cheap, and `notes` absorbs the gap meanwhile. Renaming an identifier after entries use it is a rename in the vocabulary plus the entries, so it is worth reviewing the list with the volunteers before filling many entries.
 - [Person-hours are unfamiliar to contributors] → CONTRIBUTING explains with an example; the field name says the unit; the page prints "ore-persona" rather than "ore".
 - [Public visibility] → A list of tools and "needs four people" on a public page tells a reader the trail may be rough. That is true and useful information for a hiker too, so no mitigation beyond labelling the section.
 
 ## Open Questions
 
-- Whether the volunteers want a page listing maintenance needs across all entries, which is what planning a work day calls for. It does not change anything decided here and is additive.
-- Whether `condition` should also appear on the list page or filter it. Deliberately left out until there are enough entries carrying it to tell whether it is useful.
+- Whether `condition` should also appear on the hiker's list page or filter it. Deliberately left out until there are enough entries carrying it to tell whether it is useful.
+- Whether the overview should offer a printable or offline form, since the people using it will be standing in a field without signal. Additive, and better decided after the volunteers have used the page once.
