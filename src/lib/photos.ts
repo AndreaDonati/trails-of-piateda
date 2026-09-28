@@ -27,7 +27,8 @@
  * never call them.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { basename, extname } from 'node:path';
+import { join } from 'node:path/posix';
 import { describeArea, isInsideArea } from './area';
 import { haversineMeters, type TrackPoint } from './gpx';
 

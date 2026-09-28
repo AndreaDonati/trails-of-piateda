@@ -11,5 +11,6 @@ dist/
 !.env.example
 
 # OS / editor
+.idea/
 .DS_Store
 *.log

@@ -23,7 +23,7 @@
  * dist/ chunks at build time.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join } from 'node:path/posix';
 import type { CollectionEntry } from 'astro:content';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 import { loadTrack, type Track } from './gpx';
