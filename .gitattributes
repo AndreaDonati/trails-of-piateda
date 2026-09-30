@@ -1,0 +1,28 @@
+# Normalize text in the repository and use LF in every working tree.
+# Unknown file types retain Git's automatic text/binary detection.
+* text=auto eol=lf
+
+# Source, configuration, and documentation are always text.
+*.astro text
+*.css   text
+*.mjs   text
+*.ts    text
+*.tsx   text
+*.json  text
+*.yaml  text
+*.yml   text
+*.md    text
+*.txt   text
+
+# Tracks and vector images are XML: normalize them and keep readable diffs.
+*.gpx   text
+*.svg   text
+
+# Raster images must never undergo newline conversion or textual merging.
+# The binary macro sets -text -diff -merge.
+*.[jJ][pP][gG]      binary
+*.[jJ][pP][eE][gG]  binary
+*.[pP][nN][gG]      binary
+*.[gG][iI][fF]      binary
+*.[wW][eE][bB][pP]  binary
+*.[iI][cC][oO]      binary
