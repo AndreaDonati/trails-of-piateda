@@ -1,0 +1,30 @@
+name: Rifugio ANA Le Piane - Baite della Pessa
+summary: Salita dal Rifugio ANA Le Piane alle Baite della Pessa, tra bosco di conifere e radure prative.
+difficulty: E
+municipalities: [Piateda]
+start:
+  name: Rifugio ANA Le Piane
+  # Coordinate del primo punto della traccia GPX.
+  lat: 46.131642
+  lon: 9.931555
+signage: Segnavia bianco-rossi visibili nel tratto iniziale fotografato.
+tags: [bosco, baite]
+sources:
+  - Traccia GPX Le Piane - Pessa, esportata da Komoot.
+  - Foto geolocalizzate start.jpg ed end.jpg.
+description: |
+  Il percorso collega il Rifugio ANA Le Piane alle Baite della Pessa.
+  La traccia parte nei pressi del rifugio, a circa 1.540 m di quota,
+  e si sviluppa verso sud-ovest fino a circa 1.840 m.
+
+  Nel tratto iniziale il sentiero attraversa un bosco di
+  conifere, con fondo di terra, pietre e radici e segnavia bianco-rossi
+  sugli alberi. Si arriva infine alla Baite di Pessa attraverso una radura prativa
+  con baite, circondata dal bosco.
+cover: end.jpg
+# Le posizioni delle foto vengono lette dai rispettivi dati EXIF GPS.
+photos:
+  - file: start.jpg
+    caption: Il tratto iniziale nel bosco, con segnavia bianco-rossi sugli alberi.
+  - file: end.jpg
+    caption: Radura con baite lungo il percorso verso la Pessa.
