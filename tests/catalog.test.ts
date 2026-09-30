@@ -13,7 +13,7 @@ describe('checkCatalogLayout', () => {
 
   it('accepts the fixture entries committed under content/', () => {
     expect(checkCatalogLayout()).toEqual({
-      trails: ['piateda-ambria', 'sentiero-senza-quota'],
+      trails: ['piane-pessa', 'piateda-ambria', 'sentiero-senza-quota'],
       routes: ['anello-piateda-alta', 'percorso-chiuso'],
     });
   });
