@@ -160,6 +160,7 @@ Se sbagli un nome, la build si ferma e ti elenca quelli accettati.
 | Identificatore | Attrezzo |
 | --- | --- |
 | `decespugliatore` | Decespugliatore |
+| `soffiatore` | Soffiatore |
 | `motosega` | Motosega |
 | `sega-a-mano` | Sega a mano |
 | `roncola` | Roncola |
